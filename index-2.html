@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TRAQS – Requirements Management & Traceability</title>
+<meta name="description" content="TRAQS: a web-based requirements management and traceability application with a local AI agent for safety-critical projects. CMPE 491 Senior Design Project, TED University.">
+<style>
+  :root{
+    --navy:#262a6b; --navy-d:#171a47; --gold:#f0c93a; --red:#d93b2b;
+    --ink:#1d2033; --muted:#5b6078; --bg:#f6f7fb; --card:#fff; --line:#e3e5f0;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6}
+  a{color:var(--navy)}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+  header.nav{position:sticky;top:0;z-index:10;background:var(--navy-d);color:#fff}
+  header.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:56px}
+  .brand{font-weight:800;letter-spacing:.08em;color:#fff;text-decoration:none}
+  .brand span{color:var(--gold)}
+  nav a{color:#cfd2ee;text-decoration:none;margin-left:18px;font-size:.92rem}
+  nav a:hover{color:var(--gold)}
+  .hero{background:linear-gradient(135deg,var(--navy-d),var(--navy));color:#fff;padding:84px 0 72px}
+  .hero h1{font-size:clamp(2.4rem,6vw,4rem);margin:0 0 6px;letter-spacing:.06em}
+  .hero h1 span{color:var(--gold)}
+  .hero p.tag{font-size:1.2rem;color:#dfe1f7;max-width:680px;margin:8px 0 22px}
+  .badge{display:inline-block;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:4px 14px;font-size:.85rem;color:#e8e9fb}
+  section{padding:56px 0}
+  section:nth-of-type(even){background:#fff}
+  h2{font-size:1.7rem;margin:0 0 8px;color:var(--navy)}
+  h2::after{content:"";display:block;width:48px;height:4px;background:var(--gold);border-radius:2px;margin-top:8px}
+  .lead{color:var(--muted);max-width:760px;margin:14px 0 28px}
+  .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
+  .card h3{margin:0 0 6px;font-size:1.05rem;color:var(--navy)}
+  .card p{margin:0;color:var(--muted);font-size:.95rem}
+  .ico{font-size:1.5rem;margin-bottom:8px}
+  .person{text-align:center}
+  .avatar{width:64px;height:64px;border-radius:50%;background:var(--navy);color:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.2rem;margin:0 auto 10px}
+  .role{color:var(--muted);font-size:.88rem}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);font-size:.95rem}
+  th{background:var(--navy);color:#fff;font-weight:600}
+  tr:last-child td{border-bottom:none}
+  .soon{color:var(--muted);font-style:italic}
+  footer{background:var(--navy-d);color:#b9bce0;padding:28px 0;text-align:center;font-size:.9rem}
+  @media(max-width:640px){nav{display:none}}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top">TRA<span>QS</span></a>
+    <nav>
+      <a href="#about">About</a>
+      <a href="#features">Features</a>
+      <a href="#ai">AI Agent</a>
+      <a href="#team">Team</a>
+      <a href="#docs">Documents</a>
+    </nav>
+  </div>
+</header>
+
+<div class="hero" id="top">
+  <div class="wrap">
+    <h1>TRA<span>QS</span></h1>
+    <p class="tag">Requirements management and traceability for safety-critical projects, with a local AI agent that helps and never decides on its own.</p>
+    <span class="badge">CMPE 491 · Senior Design Project I · TED University · 2026–2027 Fall</span>
+  </div>
+</div>
+
+<section id="about">
+  <div class="wrap">
+    <h2>About the Project</h2>
+    <p class="lead">TRAQS is a web-based application that lets developers manage and trace requirements in projects involving safety-critical products, such as those in the defense, medical and aerospace industries. Requirements are defined hierarchically, linked to test cases and to each other, and kept under controlled change.</p>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Key Features</h2>
+    <div class="grid" style="margin-top:24px">
+      <div class="card"><div class="ico">🗂️</div><h3>Hierarchical requirements</h3><p>Define and organize requirements in a structured, multi-level hierarchy.</p></div>
+      <div class="card"><div class="ico">🔗</div><h3>Traceability links</h3><p>Connect requirements to test cases and to each other for end-to-end traceability.</p></div>
+      <div class="card"><div class="ico">⚠️</div><h3>Impact analysis</h3><p>Identify related requirements automatically when something changes.</p></div>
+      <div class="card"><div class="ico">📌</div><h3>Baselines</h3><p>Freeze and compare the state of requirements at key project milestones.</p></div>
+      <div class="card"><div class="ico">✅</div><h3>Role-based approval</h3><p>Changes go through an approval workflow based on user roles.</p></div>
+      <div class="card"><div class="ico">🔄</div><h3>Excel &amp; ReqIF exchange</h3><p>Import and export data to work with partners and other tools.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="ai">
+  <div class="wrap">
+    <h2>AI Agent</h2>
+    <p class="lead">TRAQS integrates an AI agent that supports the requirements engineering process. It runs locally using a language model, and every suggestion requires user approval.</p>
+    <div class="grid">
+      <div class="card"><h3>Analyze documents</h3><p>Reads project-related documents and generated requirements.</p></div>
+      <div class="card"><h3>Classify by domain</h3><p>Categorizes requirements by domain, such as defense or medical.</p></div>
+      <div class="card"><h3>Evaluate &amp; rewrite</h3><p>Assesses quality and rewrites requirements to the standards of the selected domain.</p></div>
+      <div class="card"><h3>Propose links</h3><p>Suggests links between requirements and test cases for the user to review.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="team">
+  <div class="wrap">
+    <h2>Team</h2>
+    <div class="grid" style="margin-top:24px">
+      <div class="card person"><div class="avatar">ZS</div><strong>Zeynep Aybüke Seratlı</strong><div class="role">Team Member</div></div>
+      <div class="card person"><div class="avatar">FK</div><strong>Fatma Eylül Karaoğlu</strong><div class="role">Team Member</div></div>
+      <div class="card person"><div class="avatar">EE</div><strong>Ege Ersen</strong><div class="role">Team Member</div></div>
+      <div class="card person"><div class="avatar">DÖ</div><strong>Doruk Özata</strong><div class="role">Team Member</div></div>
+    </div>
+    <div class="grid" style="margin-top:20px">
+      <div class="card"><h3>Supervisor</h3><p>Mert Burkay Çöteli</p></div>
+      <div class="card"><h3>Jury Members</h3><p>Eren Ulu<br>Ayşe Yasemin Seydim</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="docs">
+  <div class="wrap">
+    <h2>Documents</h2>
+    <p class="lead">Project deliverables will be published here as they are completed.</p>
+    <table>
+      <thead><tr><th>Document</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Project Proposal</td><td class="soon">Coming soon</td></tr>
+        <tr><td>Analysis Report</td><td class="soon">Coming soon</td></tr>
+        <tr><td>Design Report</td><td class="soon">Coming soon</td></tr>
+        <tr><td>Presentations</td><td class="soon">Coming soon</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">TRAQS · CMPE 491 Senior Design Project · Department of Computer Engineering, TED University</div>
+</footer>
+
+</body>
+</html>
