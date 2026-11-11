@@ -65,6 +65,17 @@
   .pill.now{background:#fff3cf;color:#8a6a00}
   .pill.next{background:#eceef6;color:var(--muted)}
   .note{color:var(--muted);font-size:.92rem;margin-top:8px}
+  .docs-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin:24px 0}
+  .doc{display:flex;flex-direction:column;gap:6px}
+  .doc .meta{color:var(--muted);font-size:.85rem}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .btn{display:inline-block;background:var(--navy);color:#fff;text-decoration:none;border-radius:8px;padding:8px 16px;font-size:.9rem;font-weight:600}
+  .btn:hover{background:var(--navy-d);color:var(--gold)}
+  .btn.alt{background:#eef0fb;color:var(--navy)}
+  .viewer{margin-top:8px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+  .viewer iframe{width:100%;height:80vh;min-height:520px;border:0;display:block}
+  .viewer .fallback{padding:16px;font-size:.92rem;color:var(--muted)}
+  .pill.done{background:#dff3e3;color:#1c6b30}
   @media(max-width:640px){.timeline::before{display:none}.date{flex-basis:60px;height:60px}}
   footer{background:var(--navy-d);color:#b9bce0;padding:28px 0;text-align:center;font-size:.9rem}
   @media(max-width:640px){nav{display:none}}
@@ -81,6 +92,7 @@
       <a href="#ai">AI Agent</a>
       <a href="#team">Team</a>
       <a href="#docs">Roadmap</a>
+      <a href="#reports">Reports</a>
     </nav>
   </div>
 </header>
@@ -168,7 +180,7 @@
         <div class="body">
           <h3>Project Specifications</h3>
           <ul>
-            <li><span class="tag">D2</span> Project Specifications and Literature Review; project assignment finalized <span class="pill next">Upcoming</span></li>
+            <li><span class="tag">D2</span> <a href="docs/TRAQS_Project_Specifications_Report.pdf">Project Specifications Report</a>; project assignment finalized <span class="pill done">Published</span></li>
             <li><span class="tag">D3</span> TODO / Backlog document (first version) <span class="pill next">Upcoming</span></li>
           </ul>
         </div>
@@ -179,7 +191,7 @@
         <div class="body">
           <h3>Analysis</h3>
           <ul>
-            <li><span class="tag">D4</span> Project Analysis Report: requirements, use cases, system models, UI mock-ups <span class="pill next">Upcoming</span></li>
+            <li><span class="tag">D4</span> <a href="docs/TRAQS_Analysis_Report.pdf">Project Analysis Report</a>: requirements, use cases, system models, UI mock-ups <span class="pill done">Published</span></li>
             <li><span class="tag">D5</span> TODO / Backlog document (updated) <span class="pill next">Upcoming</span></li>
           </ul>
         </div>
@@ -209,6 +221,40 @@
     </div>
 
     <p class="note">The TODO / Backlog document is updated throughout the semester, and every version is published on this page.</p>
+  </div>
+</section>
+
+<section id="reports">
+  <div class="wrap">
+    <h2>Project Reports</h2>
+    <p class="lead">The submitted reports of the project are available here. Read the Analysis Report online below or download it as a PDF.</p>
+
+    <div class="docs-grid">
+      <div class="card doc">
+        <h3>Analysis Report</h3>
+        <p>Current and proposed system, functional and non-functional requirements (17 UR, 40 SR, 47 SW, 8 NFR), scenarios, use cases, class and dynamic models, and UI mock-ups.</p>
+        <div class="meta">PDF · 23 pages · November 6, 2026</div>
+        <div class="btns">
+          <a class="btn" href="docs/TRAQS_Analysis_Report.pdf" target="_blank" rel="noopener">Open PDF</a>
+          <a class="btn alt" href="docs/TRAQS_Analysis_Report.pdf" download>Download</a>
+        </div>
+      </div>
+      <div class="card doc">
+        <h3>Project Specifications Report</h3>
+        <p>Project description, constraints, professional and ethical issues, and the initial list of user requirements.</p>
+        <div class="meta">PDF · 7 pages · October 20, 2026</div>
+        <div class="btns">
+          <a class="btn" href="docs/TRAQS_Project_Specifications_Report.pdf" target="_blank" rel="noopener">Open PDF</a>
+          <a class="btn alt" href="docs/TRAQS_Project_Specifications_Report.pdf" download>Download</a>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="color:var(--navy);margin:32px 0 4px">Analysis Report (online view)</h3>
+    <div class="viewer">
+      <iframe src="docs/TRAQS_Analysis_Report.pdf#view=FitH" title="TRAQS Analysis Report"></iframe>
+      <div class="fallback">If the report does not appear in your browser, <a href="docs/TRAQS_Analysis_Report.pdf" target="_blank" rel="noopener">open the PDF directly</a>.</div>
+    </div>
   </div>
 </section>
 
