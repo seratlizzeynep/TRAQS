@@ -1,65 +1,46 @@
-import { createContext, useContext } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import en from "./locales/en.js";
+import tr from "./locales/tr.js";
 
-// All user-visible text goes through t(key). Dictionaries live in ./locales.
-const en = {
-  "app.name": "TRAQS",
-  "topbar.project": "Project",
-  "topbar.selectProject": "Select project…",
-  "topbar.search": "Search requirements",
-  "topbar.searchPlaceholder": "Search…",
-  "topbar.language": "Language",
-  "topbar.userMenu": "User menu",
-  "topbar.logout": "Log out",
-  "login.title": "Sign in",
-  "login.username": "User name",
-  "login.password": "Password",
-  "login.submit": "Sign in",
-  "login.failed": "Wrong user name or password.",
-  "login.locked": "Account is locked after too many failed attempts. Try again later.",
-  "login.error": "Could not sign in. Please try again.",
-  "projects.title": "Projects",
-  "projects.empty": "No projects yet.",
-  "projects.create": "New project",
-  "projects.name": "Project name",
-  "projects.add": "Create",
-  "projects.role": "Role",
-  "role.admin": "Admin",
-  "role.author": "Author",
-  "role.reviewer": "Reviewer",
-  "role.viewer": "Viewer",
-  "nav.modules": "Modules and objects",
-  "nav.traceability": "Traceability",
-  "nav.changes": "Change requests",
-  "nav.baselines": "Baselines",
-  "nav.importExport": "Import and export",
-  "nav.tests": "Test cases",
-  "nav.analysis": "Analysis",
-  "nav.admin": "Administration",
-  "nav.label": "Project navigation",
-  "modules.title": "Modules and objects",
-  "modules.empty": "No modules yet.",
-  "modules.add": "Add module",
-  "modules.name": "Module name",
-  "modules.noObjects": "No objects in this module.",
-  "modules.addObject": "Add object",
-  "modules.objectHeading": "Heading",
-  "modules.expand": "Expand",
-  "modules.collapse": "Collapse",
-  "page.comingSoon": "This screen is not built yet.",
-  "common.loading": "Loading…",
-  "common.error": "Something went wrong.",
-  "common.notFound": "Page not found.",
-};
+// All user-visible text goes through t(key). English is the fallback for missing keys.
+export const dictionaries = { en, tr };
+export const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "tr", label: "Türkçe" },
+];
 
-export const dictionaries = { en };
-export const LANGUAGES = [{ code: "en", label: "English" }];
+const STORAGE_KEY = "traqs.lang";
+const supported = (code) => LANGUAGES.some((l) => l.code === code);
+
+// Saved choice first, then the browser language, then English.
+export function detectLanguage() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (supported(saved)) return saved;
+  } catch { /* storage unavailable */ }
+  const nav = typeof navigator !== "undefined" ? (navigator.language ?? "").slice(0, 2).toLowerCase() : "";
+  return supported(nav) ? nav : "en";
+}
 
 const I18nContext = createContext({ lang: "en", setLang: () => {}, t: (k) => en[k] ?? k });
 
-export function I18nProvider({ children, lang = "en" }) {
-  const dict = dictionaries[lang] ?? en;
-  const t = (key) => dict[key] ?? en[key] ?? key;
-  return <I18nContext.Provider value={{ lang, setLang: () => {}, t }}>{children}</I18nContext.Provider>;
+export function I18nProvider({ children, initialLang }) {
+  const [lang, setLangState] = useState(() => (supported(initialLang) ? initialLang : detectLanguage()));
+
+  const setLang = useCallback((code) => {
+    if (!supported(code)) return;
+    setLangState(code);
+    try { localStorage.setItem(STORAGE_KEY, code); } catch { /* storage unavailable */ }
+  }, []);
+
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
+
+  const value = useMemo(() => {
+    const dict = dictionaries[lang] ?? en;
+    return { lang, setLang, t: (key) => dict[key] ?? en[key] ?? key };
+  }, [lang, setLang]);
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
 export const useI18n = () => useContext(I18nContext);
