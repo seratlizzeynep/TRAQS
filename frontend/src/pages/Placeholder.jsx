@@ -5,7 +5,7 @@ export default function Placeholder({ titleKey }) {
   const { t } = useI18n();
   return (
     <section>
-      <h1>{t(titleKey)}</h1>
+      <h1 className="screen-title">{t(titleKey)}</h1>
       <p>{t("page.comingSoon")}</p>
     </section>
   );

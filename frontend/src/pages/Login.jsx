@@ -47,7 +47,7 @@ export default function Login() {
           />
         </label>
         {error && <p role="alert" className="error">{t(error)}</p>}
-        <button type="submit" disabled={busy}>{t("login.submit")}</button>
+        <button className="primary" type="submit" disabled={busy}>{t("login.submit")}</button>
       </form>
     </main>
   );

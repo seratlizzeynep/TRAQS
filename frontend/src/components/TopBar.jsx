@@ -31,8 +31,8 @@ export default function TopBar({ projects: given }) {
     <header className="topbar" role="banner">
       <Link to="/projects" className="brand">{t("app.name")}</Link>
 
-      <label className="project-switch">
-        <span className="sr-only">{t("topbar.project")}</span>
+      <label className="project-switch pill">
+        <span aria-hidden="true">{t("topbar.projectLabel")}</span>
         <select
           aria-label={t("topbar.project")}
           value={projectId ?? ""}
@@ -66,7 +66,7 @@ export default function TopBar({ projects: given }) {
           onClick={() => setMenuOpen((o) => !o)}
         >
           {user?.username}
-          {role && <span className="badge">{t(`role.${role}`)}</span>}
+          {role && ` (${t(`role.${role}`)})`}
         </button>
         {menuOpen && (
           <div role="menu" className="menu">

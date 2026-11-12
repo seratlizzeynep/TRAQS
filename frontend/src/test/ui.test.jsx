@@ -71,7 +71,7 @@ describe("login", () => {
     expect(screen.getByRole("link", { name: "Alpha" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Project" })).toBeInTheDocument(); // project switch
     expect(screen.getByRole("searchbox", { name: "Search requirements" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Language" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Language" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "User menu" })).toHaveTextContent("elif");
     expect(sessionStorage.getItem("traqs.token")).toBe("t");
   });
@@ -97,11 +97,11 @@ describe("signed in", () => {
   it("viewer sees read-only navigation and no edit forms", async () => {
     signedIn(me());
     mount("/projects/1/modules");
-    expect(await screen.findByRole("heading", { name: "System" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /System/ })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Project navigation" });
     expect(nav).toHaveTextContent("Traceability");
     expect(nav).not.toHaveTextContent("Administration");
-    expect(nav).not.toHaveTextContent("Import and export");
+    expect(nav).not.toHaveTextContent("Import / Export");
     expect(screen.queryByRole("button", { name: "Add module" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add object" })).not.toBeInTheDocument();
   });
@@ -110,7 +110,7 @@ describe("signed in", () => {
     signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }));
     mount("/projects/1/modules");
     expect(await screen.findByRole("button", { name: "Add module" })).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Project navigation" })).toHaveTextContent("Import and export");
+    expect(screen.getByRole("navigation", { name: "Project navigation" })).toHaveTextContent("Import / Export");
   });
 
   it("admin sees all entries and can create projects", async () => {
@@ -133,6 +133,43 @@ describe("signed in", () => {
     await screen.findByText("Battery");
     await userEvent.type(screen.getByRole("searchbox"), "zzz{enter}");
     await waitFor(() => expect(screen.queryByText("Battery")).not.toBeInTheDocument());
+  });
+
+  it("module table has the mock-up columns, outline numbers and role label in the top bar", async () => {
+    signedIn(me());
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    for (const h of ["Object tree", "ID", "Text", "Priority", "Status", "Flags"]) {
+      expect(screen.getByRole("columnheader", { name: h })).toBeInTheDocument();
+    }
+    expect(screen.getByText("1.1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "User menu" })).toHaveTextContent("elif (Viewer)");
+  });
+
+  it("object detail shows text, links with a suspect tag and the AI panel", async () => {
+    signedIn(me(), {
+      "GET /objects/2": json(200, { id: 2, display_id: "REQ-0002", heading: "Battery", text: "Lasts 8 h", module_id: 7, children: [] }),
+      "GET /objects/2/links": json(200, [{ id: 1, source_id: 2, target_id: 9, suspect: 1 }]),
+      "GET /objects/9": json(404, { detail: "gone" }),
+    });
+    mount("/projects/1/objects/2");
+    expect(await screen.findByRole("heading", { name: /REQ-0002/ })).toBeInTheDocument();
+    expect(screen.getByText("Lasts 8 h")).toBeInTheDocument();
+    expect(screen.getByText("deleted object")).toBeInTheDocument();
+    expect(screen.getByText("suspect")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /AI assistant/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Classify" })).toBeDisabled();
+  });
+
+  it("change request and analysis screens render with a sample-data note", async () => {
+    signedIn(me());
+    const { unmount } = mount("/projects/1/changes");
+    expect(await screen.findByRole("heading", { name: /CR-007/ })).toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent("Sample data");
+    unmount();
+    mount("/projects/1/analysis");
+    expect(await screen.findByRole("heading", { name: /Analysis dashboard/ })).toBeInTheDocument();
+    expect(screen.getByText("92 %")).toBeInTheDocument();
   });
 
   it("a user without access to the project gets a not-found message", async () => {

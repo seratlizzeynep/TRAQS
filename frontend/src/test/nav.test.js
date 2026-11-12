@@ -7,7 +7,7 @@ const keys = (role) => navFor(role).map((i) => i.key);
 
 describe("role based navigation", () => {
   it("admin sees everything", () => {
-    expect(keys("admin")).toEqual(["modules", "traceability", "changes", "baselines", "importExport", "tests", "analysis", "admin"]);
+    expect(keys("admin")).toEqual(["modules", "traceability", "changes", "baselines", "tests", "analysis", "importExport", "admin"]);
   });
   it("author may import/export but not administer", () => {
     expect(keys("author")).toContain("importExport");

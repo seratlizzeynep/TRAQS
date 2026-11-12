@@ -46,21 +46,22 @@ describe("language selection", () => {
   it("switching the language changes the text, remembers the choice and sets <html lang>", async () => {
     Object.defineProperty(navigator, "language", { value: "en-US", configurable: true });
     render(<I18nProvider><LanguageSwitch /><Probe /></I18nProvider>);
-    await userEvent.selectOptions(screen.getByRole("combobox"), "tr");
+    await userEvent.click(screen.getByRole("button", { name: "Türkçe" }));
     expect(screen.getByTestId("p")).toHaveTextContent("tr:Projeler");
     expect(localStorage.getItem("traqs.lang")).toBe("tr");
     expect(document.documentElement.lang).toBe("tr");
     // a new session starts in the saved language
     expect(detectLanguage()).toBe("tr");
-    await userEvent.selectOptions(screen.getByRole("combobox"), "en");
+    await userEvent.click(screen.getByRole("button", { name: "English" }));
     expect(screen.getByTestId("p")).toHaveTextContent("en:Projects");
+    expect(screen.getByRole("button", { name: "English" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("the login screen has the language switch and translates", async () => {
     Object.defineProperty(navigator, "language", { value: "en-US", configurable: true });
     render(<I18nProvider><AuthProvider><Login /></AuthProvider></I18nProvider>);
     expect(screen.getByLabelText("User name")).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Language" }), "tr");
+    await userEvent.click(screen.getByRole("button", { name: "Türkçe" }));
     expect(screen.getByLabelText("Kullanıcı adı")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Giriş yap" })).toBeInTheDocument();
   });

@@ -1,16 +1,19 @@
 import { LANGUAGES, useI18n } from "../i18n.jsx";
 
-// Shown on the login screen and in the top bar (NFR-03).
+// "TR | EN" toggle, shown on the login screen and in the top bar (NFR-03).
 export default function LanguageSwitch() {
   const { lang, setLang, t } = useI18n();
+  const order = [...LANGUAGES].reverse(); // TR | EN
   return (
-    <label className="lang">
-      <span className="sr-only">{t("topbar.language")}</span>
-      <select value={lang} onChange={(e) => setLang(e.target.value)} aria-label={t("topbar.language")}>
-        {LANGUAGES.map((l) => (
-          <option key={l.code} value={l.code}>{l.label}</option>
-        ))}
-      </select>
-    </label>
+    <div className="lang" role="group" aria-label={t("topbar.language")}>
+      {order.map((l, i) => (
+        <span key={l.code}>
+          {i > 0 && <span className="sep" aria-hidden="true"> | </span>}
+          <button type="button" aria-pressed={lang === l.code} lang={l.code} aria-label={l.label} title={l.label} onClick={() => setLang(l.code)}>
+            {l.code.toUpperCase()}
+          </button>
+        </span>
+      ))}
+    </div>
   );
 }

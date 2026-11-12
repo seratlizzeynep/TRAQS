@@ -28,7 +28,7 @@ export default function Projects() {
   };
 
   return (
-    <section>
+    <section className="plain">
       <h1>{t("projects.title")}</h1>
       {error && <p role="alert" className="error">{t("common.error")}</p>}
       {can(roleIn(user, null), "manage") && (
@@ -40,7 +40,7 @@ export default function Projects() {
             onChange={(e) => setName(e.target.value)}
             required
           />
-          <button type="submit">{t("projects.add")}</button>
+          <button className="primary" type="submit">{t("projects.add")}</button>
         </form>
       )}
       {projects === null ? (
