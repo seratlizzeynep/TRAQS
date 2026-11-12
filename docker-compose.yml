@@ -5,7 +5,7 @@ services:
       # Change these before any real use (or set them in a .env file next to this file).
       TRAQS_JWT_SECRET: ${TRAQS_JWT_SECRET:-change-me-in-production}
       TRAQS_ADMIN_USER: ${TRAQS_ADMIN_USER:-admin}
-      TRAQS_ADMIN_PASSWORD: ${TRAQS_ADMIN_PASSWORD:-change-me-now}
+      TRAQS_ADMIN_PASSWORD: ${TRAQS_ADMIN_PASSWORD:-12345}
     ports:
       - "8000:8000" # API + docs: http://localhost:8000/api/v1/docs
     volumes:
