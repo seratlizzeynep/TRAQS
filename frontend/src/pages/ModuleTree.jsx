@@ -1,0 +1,179 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { get, post } from "../api.js";
+import { useAuth } from "../auth.jsx";
+import { useI18n } from "../i18n.jsx";
+import { can, roleIn } from "../permissions.js";
+
+// Keeps a node if it or any descendant matches the search text.
+export function filterTree(nodes, q) {
+  if (!q) return nodes;
+  const needle = q.toLowerCase();
+  return nodes.flatMap((n) => {
+    const kids = filterTree(n.children, q);
+    const hit = `${n.display_id} ${n.heading} ${n.text}`.toLowerCase().includes(needle);
+    return hit || kids.length ? [{ ...n, children: hit ? n.children : kids }] : [];
+  });
+}
+
+// Outline numbers (1, 1.1, 1.2, 2, ...) computed on the full tree so they stay stable while filtering.
+export function outlineNumbers(nodes, prefix = "", map = new Map()) {
+  nodes.forEach((n, i) => {
+    const num = prefix ? `${prefix}.${i + 1}` : `${i + 1}`;
+    map.set(n.id, num);
+    outlineNumbers(n.children, num, map);
+  });
+  return map;
+}
+
+// Visible rows in display order; children of collapsed nodes are skipped.
+export function visibleRows(nodes, collapsed, depth = 0, out = []) {
+  for (const node of nodes) {
+    out.push({ node, depth });
+    if (node.children.length && !collapsed.has(node.id)) visibleRows(node.children, collapsed, depth + 1, out);
+  }
+  return out;
+}
+
+function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
+  const { t } = useI18n();
+  const [collapsed, setCollapsed] = useState(new Set());
+  const [adding, setAdding] = useState(false);
+  const [heading, setHeading] = useState("");
+  const numbers = useMemo(() => outlineNumbers(tree), [tree]);
+  const rows = visibleRows(filterTree(tree, q), collapsed);
+
+  const toggle = (id) => {
+    const next = new Set(collapsed);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setCollapsed(next);
+  };
+  const add = async (e) => {
+    e.preventDefault();
+    await post(`/modules/${module.id}/objects`, { heading }).catch(onError);
+    setHeading("");
+    setAdding(false);
+    onChanged();
+  };
+  const unavailable = { "aria-disabled": true, title: t("common.unavailable"), onClick: (e) => e.preventDefault() };
+
+  return (
+    <article>
+      <h2 className="screen-title">
+        <span>S3 · {t("modules.module")}: {module.name}</span>
+        <span className="badge tag">{t("modules.view")}</span>
+      </h2>
+      <div className="toolbar">
+        {writable && (
+          <button type="button" aria-expanded={adding} onClick={() => setAdding(!adding)}>{t("modules.addObjectBtn")}</button>
+        )}
+        <button type="button" {...unavailable}>{t("modules.filter")} ▾</button>
+        <button type="button" {...unavailable}>{t("modules.columns")} ▾</button>
+        <button type="button" {...unavailable}>{t("modules.import")}</button>
+        <button type="button" {...unavailable}>{t("modules.export")}</button>
+      </div>
+      {writable && adding && (
+        <form onSubmit={add} className="inline-form">
+          <input aria-label={t("modules.objectHeading")} placeholder={t("modules.objectHeading")} value={heading} onChange={(e) => setHeading(e.target.value)} autoFocus />
+          <button className="primary" type="submit">{t("modules.addObject")}</button>
+        </form>
+      )}
+      <div className="table-wrap">
+        <table className="grid">
+          <thead>
+            <tr>
+              {["col.tree", "col.id", "col.text", "col.priority", "col.status", "col.flags"].map((k) => (
+                <th key={k} scope="col">{t(k)}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr className="empty-row"><td colSpan={6}>{t("modules.noObjects")}</td></tr>
+            )}
+            {rows.map(({ node, depth }) => {
+              const has = node.children.length > 0;
+              const open = !collapsed.has(node.id);
+              return (
+                <tr key={node.id}>
+                  <td className="tree" style={{ paddingLeft: `${0.6 + depth * 1.4}rem` }}>
+                    {has ? (
+                      <button type="button" className="twisty" aria-expanded={open}
+                        aria-label={`${open ? t("modules.collapse") : t("modules.expand")} ${node.display_id}`}
+                        onClick={() => toggle(node.id)}>{open ? "▾" : "▸"}</button>
+                    ) : (
+                      <span className="twisty" />
+                    )}
+                    <span className="num">{numbers.get(node.id)}</span>
+                    <span>{node.heading}</span>
+                  </td>
+                  <td><Link to={`../objects/${node.id}`}>{node.display_id}</Link></td>
+                  <td>{node.text}</td>
+                  <td className="muted">—</td>
+                  <td><span className="badge yellow">{t("status.notReviewed")}</span></td>
+                  <td className="muted">—</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  );
+}
+
+// S3: modules and their ordered object tree.
+export default function ModuleTree() {
+  const { t } = useI18n();
+  const { user } = useAuth();
+  const { projectId } = useParams();
+  const [params] = useSearchParams();
+  const q = params.get("q") ?? "";
+  const writable = can(roleIn(user, projectId), "write");
+
+  const [modules, setModules] = useState(null);
+  const [trees, setTrees] = useState({});
+  const [moduleName, setModuleName] = useState("");
+  const [error, setError] = useState(false);
+  const fail = useCallback(() => setError(true), []);
+
+  const load = useCallback(async () => {
+    try {
+      const mods = await get(`/projects/${projectId}/modules`);
+      setModules(mods);
+      const entries = await Promise.all(mods.map(async (m) => [m.id, await get(`/modules/${m.id}/objects`)]));
+      setTrees(Object.fromEntries(entries));
+    } catch {
+      setError(true);
+    }
+  }, [projectId]);
+  useEffect(() => { load(); }, [load]);
+
+  const addModule = async (e) => {
+    e.preventDefault();
+    await post(`/projects/${projectId}/modules`, { name: moduleName }).catch(fail);
+    setModuleName("");
+    load();
+  };
+
+  return (
+    <section>
+      {error && <p role="alert" className="error">{t("common.error")}</p>}
+      {writable && (
+        <form onSubmit={addModule} className="inline-form">
+          <input aria-label={t("modules.name")} placeholder={t("modules.name")} value={moduleName} onChange={(e) => setModuleName(e.target.value)} required />
+          <button className="primary" type="submit">{t("modules.add")}</button>
+        </form>
+      )}
+      {modules === null ? (
+        <p>{t("common.loading")}</p>
+      ) : modules.length === 0 ? (
+        <p>{t("modules.empty")}</p>
+      ) : (
+        modules.map((m) => (
+          <ModuleTable key={m.id} module={m} tree={trees[m.id] ?? []} q={q} writable={writable} onChanged={load} onError={fail} />
+        ))
+      )}
+    </section>
+  );
+}
