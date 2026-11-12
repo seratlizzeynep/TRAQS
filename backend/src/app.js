@@ -1,5 +1,7 @@
 import express from "express";
 import { nextDisplayId } from "./db.js";
+import { verifyJwt } from "./jwt.js";
+import { openapi, docsHtml } from "./openapi.js";
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -37,11 +39,44 @@ function parentId(body) {
 }
 
 // Internal columns (ID counter, soft-delete marker) are removed from every JSON response below.
-export function createApp(db) {
+export function createApp(db, { jwtSecret } = {}) {
+  if (!jwtSecret) throw new Error("createApp requires a jwtSecret");
   const app = express();
   app.use(express.json());
   app.set("json replacer", (k, v) => (k === "next_seq" || k === "deleted_at" ? undefined : v));
   const api = express.Router();
+
+  // ------------------------------------------------- docs (public)
+  api.get("/openapi.json", (_req, res) => res.json(openapi));
+  api.get("/docs", (_req, res) => res.type("html").send(docsHtml));
+
+  // ------------------------------------------- JWT authentication
+  // Every other route needs `Authorization: Bearer <jwt>`. The token carries `grants`:
+  // { "*": role } for access to all projects, or { "<projectId>": role } per project.
+  api.use((req, _res, next) => {
+    const m = /^Bearer (.+)$/.exec(req.get("authorization") ?? "");
+    if (!m) throw new HttpError(401, "missing bearer token");
+    try {
+      const claims = verifyJwt(m[1], jwtSecret);
+      req.auth = { sub: claims.sub, grants: claims.grants ?? {} };
+    } catch (e) {
+      throw new HttpError(401, e.message);
+    }
+    next();
+  });
+
+  // Rejects calls that have no grant for the project (project isolation).
+  // `action` is "read" | "write" | "manage"; it is checked against roles in a later step.
+  // eslint-disable-next-line no-unused-vars
+  const access = (req, projectId, action) => {
+    const g = req.auth.grants;
+    if (projectId === null) {
+      if (!g["*"]) throw new HttpError(403, "forbidden");
+      return;
+    }
+    if (!(g[projectId] ?? g["*"])) throw new HttpError(403, "no access to this project");
+  };
+  const visibleProject = (req, projectId) => !!(req.auth.grants[projectId] ?? req.auth.grants["*"]);
 
   const id = (req) => {
     const n = Number(req.params.id);
@@ -54,18 +89,29 @@ export function createApp(db) {
     return row;
   };
 
+  const projectOfModule = (m) => m.project_id;
+  const projectOfObject = (o) => db.prepare("SELECT project_id FROM modules WHERE id = ?").get(o.module_id).project_id;
+
   // ------------------------------------------------ projects & modules
   // Both share the {name, description} shape.
   api.post("/projects", (req, res) => {
+    access(req, null, "manage");
     const name = str(req.body, "name", { required: true, max: 200 });
     const description = str(req.body, "description") ?? "";
     const r = db.prepare("INSERT INTO projects (name, description) VALUES (?, ?)").run(name, description);
     res.status(201).json(find("projects", "Project", r.lastInsertRowid));
   });
-  api.get("/projects", (_req, res) => res.json(db.prepare("SELECT * FROM projects ORDER BY id").all()));
-  api.get("/projects/:id", (req, res) => res.json(find("projects", "Project", id(req))));
+  api.get("/projects", (req, res) =>
+    res.json(db.prepare("SELECT * FROM projects ORDER BY id").all().filter((p) => visibleProject(req, p.id)))
+  );
+  api.get("/projects/:id", (req, res) => {
+    const p = find("projects", "Project", id(req));
+    access(req, p.id, "read");
+    res.json(p);
+  });
   api.patch("/projects/:id", (req, res) => {
     const p = find("projects", "Project", id(req));
+    access(req, p.id, "manage");
     const name = str(req.body, "name", { required: req.body.name !== undefined, max: 200 }) ?? p.name;
     const description = str(req.body, "description") ?? p.description;
     db.prepare("UPDATE projects SET name = ?, description = ? WHERE id = ?").run(name, description, p.id);
@@ -73,12 +119,14 @@ export function createApp(db) {
   });
   api.delete("/projects/:id", (req, res) => {
     const p = find("projects", "Project", id(req));
+    access(req, p.id, "manage");
     db.prepare("DELETE FROM projects WHERE id = ?").run(p.id);
     res.status(204).end();
   });
 
   api.post("/projects/:id/modules", (req, res) => {
     const p = find("projects", "Project", id(req));
+    access(req, p.id, "write");
     const name = str(req.body, "name", { required: true, max: 200 });
     const description = str(req.body, "description") ?? "";
     const r = db
@@ -88,11 +136,17 @@ export function createApp(db) {
   });
   api.get("/projects/:id/modules", (req, res) => {
     const p = find("projects", "Project", id(req));
+    access(req, p.id, "read");
     res.json(db.prepare("SELECT * FROM modules WHERE project_id = ? ORDER BY id").all(p.id));
   });
-  api.get("/modules/:id", (req, res) => res.json(find("modules", "Module", id(req))));
+  api.get("/modules/:id", (req, res) => {
+    const m = find("modules", "Module", id(req));
+    access(req, projectOfModule(m), "read");
+    res.json(m);
+  });
   api.patch("/modules/:id", (req, res) => {
     const m = find("modules", "Module", id(req));
+    access(req, projectOfModule(m), "write");
     const name = str(req.body, "name", { required: req.body.name !== undefined, max: 200 }) ?? m.name;
     const description = str(req.body, "description") ?? m.description;
     db.prepare("UPDATE modules SET name = ?, description = ? WHERE id = ?").run(name, description, m.id);
@@ -100,6 +154,7 @@ export function createApp(db) {
   });
   api.delete("/modules/:id", (req, res) => {
     const m = find("modules", "Module", id(req));
+    access(req, projectOfModule(m), "write");
     db.prepare("DELETE FROM modules WHERE id = ?").run(m.id);
     res.status(204).end();
   });
@@ -134,6 +189,7 @@ export function createApp(db) {
 
   api.post("/modules/:id/objects", (req, res) => {
     const m = find("modules", "Module", id(req));
+    access(req, projectOfModule(m), "write");
     const heading = str(req.body, "heading", { max: 300 }) ?? "";
     const text = str(req.body, "text") ?? "";
     const parent = parentId(req.body);
@@ -156,6 +212,7 @@ export function createApp(db) {
   // Nested, ordered tree; `?flat=true` returns a flat list.
   api.get("/modules/:id/objects", (req, res) => {
     const m = find("modules", "Module", id(req));
+    access(req, projectOfModule(m), "read");
     const rows = db.prepare("SELECT * FROM objects WHERE module_id = ? AND deleted_at IS NULL ORDER BY position, id").all(m.id);
     const nodes = new Map(rows.map((r) => [r.id, { ...r, children: [] }]));
     if (req.query.flat === "true") return res.json([...nodes.values()]);
@@ -164,10 +221,15 @@ export function createApp(db) {
     res.json(roots);
   });
 
-  api.get("/objects/:id", (req, res) => res.json(find("objects", "Object", id(req))));
+  api.get("/objects/:id", (req, res) => {
+    const o = find("objects", "Object", id(req));
+    access(req, projectOfObject(o), "read");
+    res.json(o);
+  });
 
   api.patch("/objects/:id", (req, res) => {
     const o = find("objects", "Object", id(req));
+    access(req, projectOfObject(o), "write");
     const heading = str(req.body, "heading", { max: 300 }) ?? o.heading;
     const text = str(req.body, "text") ?? o.text;
     db.prepare("UPDATE objects SET heading = ?, text = ? WHERE id = ?").run(heading, text, o.id);
@@ -177,6 +239,7 @@ export function createApp(db) {
   // Re-parent and/or reorder within the module. Omitted position = append.
   api.post("/objects/:id/move", (req, res) => {
     const o = find("objects", "Object", id(req));
+    access(req, projectOfObject(o), "write");
     const parent = parentId(req.body);
     const requested = pos(req.body);
     db.transaction(() => {
@@ -199,6 +262,7 @@ export function createApp(db) {
   // (or come from) them become suspect, and the remaining siblings are renumbered gap-free.
   api.delete("/objects/:id", (req, res) => {
     const o = find("objects", "Object", id(req));
+    access(req, projectOfObject(o), "write");
     db.transaction(() => {
       const subtree = db
         .prepare(
@@ -228,6 +292,7 @@ export function createApp(db) {
   // Blacklist of deleted IDs of a project (read-only).
   api.get("/projects/:id/id-blacklist", (req, res) => {
     const p = find("projects", "Project", id(req));
+    access(req, p.id, "read");
     res.json(
       db.prepare("SELECT display_id, deleted_at FROM id_blacklist WHERE project_id = ? ORDER BY display_id").all(p.id)
     );
@@ -236,10 +301,12 @@ export function createApp(db) {
   // ----------------------------------------------------------- links
   api.post("/objects/:id/links", (req, res) => {
     const src = find("objects", "Object", id(req));
+    access(req, projectOfObject(src), "write");
     const target = req.body.target_id;
     if (!isInt(target)) throw new HttpError(422, "target_id must be an integer");
     if (target === src.id) throw new HttpError(422, "an object cannot link to itself");
-    find("objects", "Object", target);
+    const tgt = find("objects", "Object", target);
+    if (projectOfObject(tgt) !== projectOfObject(src)) throw new HttpError(422, "target must be in the same project");
     try {
       const r = db.prepare("INSERT INTO links (source_id, target_id) VALUES (?, ?)").run(src.id, target);
       res.status(201).json(db.prepare("SELECT * FROM links WHERE id = ?").get(r.lastInsertRowid));
@@ -250,6 +317,7 @@ export function createApp(db) {
   });
   api.get("/objects/:id/links", (req, res) => {
     const o = find("objects", "Object", id(req));
+    access(req, projectOfObject(o), "read");
     res.json(db.prepare("SELECT * FROM links WHERE source_id = ? OR target_id = ? ORDER BY id").all(o.id, o.id));
   });
 
