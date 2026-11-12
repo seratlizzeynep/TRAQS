@@ -1,14 +1,8 @@
 import express from "express";
 import { nextDisplayId } from "./db.js";
-import { verifyJwt } from "./jwt.js";
+import { createAuth } from "./auth.js";
+import { HttpError } from "./errors.js";
 import { openapi, docsHtml } from "./openapi.js";
-
-class HttpError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
 
 const isInt = (v) => Number.isInteger(v);
 
@@ -39,8 +33,11 @@ function parentId(body) {
 }
 
 // Internal columns (ID counter, soft-delete marker) are removed from every JSON response below.
-export function createApp(db, { jwtSecret } = {}) {
-  if (!jwtSecret) throw new Error("createApp requires a jwtSecret");
+// options: { jwtSecret (required), now, sessionTimeoutMs, maxFailedLogins, lockMs }
+export function createApp(db, options = {}) {
+  if (!options.jwtSecret) throw new Error("createApp requires a jwtSecret");
+  const auth = createAuth(db, options);
+  const { access, canSeeProject: visibleProject } = auth;
   const app = express();
   app.use(express.json());
   app.set("json replacer", (k, v) => (k === "next_seq" || k === "deleted_at" ? undefined : v));
@@ -50,33 +47,12 @@ export function createApp(db, { jwtSecret } = {}) {
   api.get("/openapi.json", (_req, res) => res.json(openapi));
   api.get("/docs", (_req, res) => res.type("html").send(docsHtml));
 
-  // ------------------------------------------- JWT authentication
-  // Every other route needs `Authorization: Bearer <jwt>`. The token carries `grants`:
-  // { "*": role } for access to all projects, or { "<projectId>": role } per project.
-  api.use((req, _res, next) => {
-    const m = /^Bearer (.+)$/.exec(req.get("authorization") ?? "");
-    if (!m) throw new HttpError(401, "missing bearer token");
-    try {
-      const claims = verifyJwt(m[1], jwtSecret);
-      req.auth = { sub: claims.sub, grants: claims.grants ?? {} };
-    } catch (e) {
-      throw new HttpError(401, e.message);
-    }
-    next();
-  });
+  // ------------------------------------------------- login (public)
+  auth.mountPublic(api);
 
-  // Rejects calls that have no grant for the project (project isolation).
-  // `action` is "read" | "write" | "manage"; it is checked against roles in a later step.
-  // eslint-disable-next-line no-unused-vars
-  const access = (req, projectId, action) => {
-    const g = req.auth.grants;
-    if (projectId === null) {
-      if (!g["*"]) throw new HttpError(403, "forbidden");
-      return;
-    }
-    if (!(g[projectId] ?? g["*"])) throw new HttpError(403, "no access to this project");
-  };
-  const visibleProject = (req, projectId) => !!(req.auth.grants[projectId] ?? req.auth.grants["*"]);
+  // ------------------------------------------- JWT authentication
+  // Everything below needs `Authorization: Bearer <jwt>` from /auth/login.
+  api.use(auth.authenticate);
 
   const id = (req) => {
     const n = Number(req.params.id);
@@ -88,6 +64,7 @@ export function createApp(db, { jwtSecret } = {}) {
     if (!row || row.deleted_at) throw new HttpError(404, `${label} ${n} not found`);
     return row;
   };
+  auth.mountProtected(api, { find, id });
 
   const projectOfModule = (m) => m.project_id;
   const projectOfObject = (o) => db.prepare("SELECT project_id FROM modules WHERE id = ?").get(o.module_id).project_id;

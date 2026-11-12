@@ -38,6 +38,8 @@ export const openapi = {
     { name: "Objects" },
     { name: "Links" },
     { name: "Meta" },
+    { name: "Auth" },
+    { name: "Users" },
   ],
   components: {
     securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" } },
@@ -105,6 +107,34 @@ export const openapi = {
           suspect: { type: "integer", enum: [0, 1], description: "1 when an end of the link was deleted" },
         },
       },
+      Role: { type: "string", enum: ["admin", "author", "reviewer", "viewer"] },
+      LoginInput: {
+        type: "object",
+        required: ["username", "password"],
+        properties: { username: { type: "string" }, password: { type: "string", format: "password" } },
+      },
+      User: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          username: { type: "string" },
+          is_admin: { type: "boolean" },
+          locked: { type: "boolean" },
+        },
+      },
+      UserInput: {
+        type: "object",
+        required: ["username", "password"],
+        properties: {
+          username: { type: "string" },
+          password: { type: "string", minLength: 8 },
+          is_admin: { type: "boolean" },
+        },
+      },
+      Member: {
+        type: "object",
+        properties: { user_id: { type: "integer" }, role: ref("Role") },
+      },
       BlacklistEntry: {
         type: "object",
         properties: { display_id: { type: "string" }, deleted_at: { type: "string", format: "date-time" } },
@@ -112,6 +142,57 @@ export const openapi = {
     },
   },
   paths: {
+    "/auth/login": {
+      post: op("Log in; returns a JWT (expires after 30 min of inactivity, account locks after 5 failures)", "Auth", {
+        secured: false,
+        requestBody: body(ref("LoginInput")),
+        responses: {
+          ...ok("Token", {
+            type: "object",
+            properties: {
+              token: { type: "string" },
+              token_type: { type: "string", example: "Bearer" },
+              inactivity_timeout_sec: { type: "integer" },
+              user: ref("User"),
+            },
+          }),
+          401: { description: "Invalid credentials" },
+          423: { description: "Account locked" },
+        },
+      }),
+    },
+    "/auth/logout": { post: op("End the session", "Auth", { responses: ok("Logged out", null, "204") }) },
+    "/auth/me": {
+      get: op("Current user and memberships", "Auth", {
+        responses: ok("User", {
+          allOf: [ref("User"), { type: "object", properties: { memberships: arr({ type: "object" }) } }],
+        }),
+      }),
+    },
+    "/users": {
+      get: op("List users (administrator)", "Users", { responses: ok("Users", arr(ref("User"))) }),
+      post: op("Create a user (administrator)", "Users", {
+        requestBody: body(ref("UserInput")),
+        responses: ok("Created", ref("User"), "201"),
+      }),
+    },
+    "/users/{id}/unlock": {
+      post: op("Unlock a locked account (administrator)", "Users", { params: [idParam], responses: ok("User", ref("User")) }),
+    },
+    "/projects/{id}/members": {
+      get: op("Members and roles of a project", "Projects", { params: [idParam], responses: ok("Members", arr(ref("Member"))) }),
+    },
+    "/projects/{id}/members/{userId}": {
+      put: op("Set the role of a user in a project", "Projects", {
+        params: [idParam, { name: "userId", in: "path", required: true, schema: { type: "integer" } }],
+        requestBody: body({ type: "object", required: ["role"], properties: { role: ref("Role") } }),
+        responses: ok("Member", ref("Member")),
+      }),
+      delete: op("Remove a user from a project", "Projects", {
+        params: [idParam, { name: "userId", in: "path", required: true, schema: { type: "integer" } }],
+        responses: ok("Removed", null, "204"),
+      }),
+    },
     "/openapi.json": { get: op("This document", "Meta", { secured: false, responses: ok("OpenAPI document") }) },
     "/projects": {
       get: op("List the projects the caller may access", "Projects", { responses: ok("Projects", arr(ref("Project"))) }),

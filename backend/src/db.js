@@ -42,6 +42,26 @@ export function openDb(path = process.env.TRAQS_DATABASE ?? "traqs.db") {
       suspect INTEGER NOT NULL DEFAULT 0,
       UNIQUE (source_id, target_id)
     );
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      password_hash TEXT NOT NULL,
+      is_admin INTEGER NOT NULL DEFAULT 0,
+      failed_attempts INTEGER NOT NULL DEFAULT 0,
+      locked_until INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS memberships (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      role TEXT NOT NULL CHECK (role IN ('admin', 'author', 'reviewer', 'viewer')),
+      PRIMARY KEY (user_id, project_id)
+    );
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      last_activity INTEGER NOT NULL,
+      revoked INTEGER NOT NULL DEFAULT 0
+    );
     CREATE INDEX IF NOT EXISTS idx_modules_project ON modules(project_id);
     CREATE INDEX IF NOT EXISTS idx_objects_module ON objects(module_id);
     CREATE INDEX IF NOT EXISTS idx_objects_parent ON objects(parent_id);
