@@ -28,7 +28,7 @@ export default {
   "nav.modules": "Modüller",
   "nav.traceability": "İzlenebilirlik",
   "nav.changes": "Değişiklik istekleri",
-  "nav.baselines": "Temel çizgiler",
+  "nav.baselines": "Baseline",
   "nav.importExport": "İçe / Dışa aktarma",
   "nav.tests": "Test senaryoları",
   "nav.analysis": "Analiz",
