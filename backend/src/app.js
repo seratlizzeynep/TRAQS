@@ -1,4 +1,5 @@
 import express from "express";
+import { nextDisplayId } from "./db.js";
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -35,9 +36,11 @@ function parentId(body) {
   return v;
 }
 
+// Internal columns (ID counter, soft-delete marker) are removed from every JSON response below.
 export function createApp(db) {
   const app = express();
   app.use(express.json());
+  app.set("json replacer", (k, v) => (k === "next_seq" || k === "deleted_at" ? undefined : v));
   const api = express.Router();
 
   const id = (req) => {
@@ -47,7 +50,7 @@ export function createApp(db) {
   };
   const find = (table, label, n) => {
     const row = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(n);
-    if (!row) throw new HttpError(404, `${label} ${n} not found`);
+    if (!row || row.deleted_at) throw new HttpError(404, `${label} ${n} not found`);
     return row;
   };
 
@@ -102,7 +105,8 @@ export function createApp(db) {
   });
 
   // --------------------------------------------------------- objects
-  const sibCond = (parent) => (parent === null ? "parent_id IS NULL" : "parent_id = ?");
+  const sibCond = (parent) =>
+    (parent === null ? "parent_id IS NULL" : "parent_id = ?") + " AND deleted_at IS NULL";
   const sibArgs = (module, parent) => (parent === null ? [module] : [module, parent]);
 
   const countSiblings = (module, parent, excludeId = -1) =>
@@ -140,8 +144,10 @@ export function createApp(db) {
       const position = requested === null ? n : Math.min(requested, n);
       makeRoom(m.id, parent, position);
       const r = db
-        .prepare("INSERT INTO objects (module_id, parent_id, position, heading, text) VALUES (?, ?, ?, ?, ?)")
-        .run(m.id, parent, position, heading, text);
+        .prepare(
+          "INSERT INTO objects (module_id, parent_id, position, heading, text, display_id) VALUES (?, ?, ?, ?, ?, ?)"
+        )
+        .run(m.id, parent, position, heading, text, nextDisplayId(db, m.project_id));
       return r.lastInsertRowid;
     })();
     res.status(201).json(find("objects", "Object", created));
@@ -150,7 +156,7 @@ export function createApp(db) {
   // Nested, ordered tree; `?flat=true` returns a flat list.
   api.get("/modules/:id/objects", (req, res) => {
     const m = find("modules", "Module", id(req));
-    const rows = db.prepare("SELECT * FROM objects WHERE module_id = ? ORDER BY position, id").all(m.id);
+    const rows = db.prepare("SELECT * FROM objects WHERE module_id = ? AND deleted_at IS NULL ORDER BY position, id").all(m.id);
     const nodes = new Map(rows.map((r) => [r.id, { ...r, children: [] }]));
     if (req.query.flat === "true") return res.json([...nodes.values()]);
     const roots = [];
@@ -189,14 +195,62 @@ export function createApp(db) {
     res.json(find("objects", "Object", o.id));
   });
 
-  // Deletes the object and its subtree; remaining siblings are renumbered gap-free.
+  // Soft-deletes the object and its subtree. Their IDs go on the blacklist, links that point to
+  // (or come from) them become suspect, and the remaining siblings are renumbered gap-free.
   api.delete("/objects/:id", (req, res) => {
     const o = find("objects", "Object", id(req));
     db.transaction(() => {
-      db.prepare("DELETE FROM objects WHERE id = ?").run(o.id);
+      const subtree = db
+        .prepare(
+          `WITH RECURSIVE sub(id) AS (
+             SELECT id FROM objects WHERE id = ?
+             UNION ALL
+             SELECT c.id FROM objects c JOIN sub ON c.parent_id = sub.id WHERE c.deleted_at IS NULL
+           ) SELECT o.id, o.display_id FROM objects o JOIN sub ON sub.id = o.id`
+        )
+        .all(o.id);
+      const { project_id } = db.prepare("SELECT project_id FROM modules WHERE id = ?").get(o.module_id);
+      const now = new Date().toISOString();
+      for (const row of subtree) {
+        db.prepare("UPDATE objects SET deleted_at = ? WHERE id = ?").run(now, row.id);
+        db.prepare("INSERT OR IGNORE INTO id_blacklist (project_id, display_id, deleted_at) VALUES (?, ?, ?)").run(
+          project_id,
+          row.display_id,
+          now
+        );
+        db.prepare("UPDATE links SET suspect = 1 WHERE source_id = ? OR target_id = ?").run(row.id, row.id);
+      }
       closeGap(o.module_id, o.parent_id, o.position);
     })();
     res.status(204).end();
+  });
+
+  // Blacklist of deleted IDs of a project (read-only).
+  api.get("/projects/:id/id-blacklist", (req, res) => {
+    const p = find("projects", "Project", id(req));
+    res.json(
+      db.prepare("SELECT display_id, deleted_at FROM id_blacklist WHERE project_id = ? ORDER BY display_id").all(p.id)
+    );
+  });
+
+  // ----------------------------------------------------------- links
+  api.post("/objects/:id/links", (req, res) => {
+    const src = find("objects", "Object", id(req));
+    const target = req.body.target_id;
+    if (!isInt(target)) throw new HttpError(422, "target_id must be an integer");
+    if (target === src.id) throw new HttpError(422, "an object cannot link to itself");
+    find("objects", "Object", target);
+    try {
+      const r = db.prepare("INSERT INTO links (source_id, target_id) VALUES (?, ?)").run(src.id, target);
+      res.status(201).json(db.prepare("SELECT * FROM links WHERE id = ?").get(r.lastInsertRowid));
+    } catch (e) {
+      if (String(e.code).startsWith("SQLITE_CONSTRAINT")) throw new HttpError(409, "link already exists");
+      throw e;
+    }
+  });
+  api.get("/objects/:id/links", (req, res) => {
+    const o = find("objects", "Object", id(req));
+    res.json(db.prepare("SELECT * FROM links WHERE source_id = ? OR target_id = ? ORDER BY id").all(o.id, o.id));
   });
 
   app.use("/api/v1", api);
