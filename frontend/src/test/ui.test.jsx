@@ -31,6 +31,16 @@ const mount = (path = "/") =>
     </MemoryRouter>
   );
 
+// attribute types and definitions as the server describes them
+const TYPES = [
+  { type: "text", label: "Text", input: "text", option_fields: [] },
+  { type: "enumeration", label: "Enumeration", input: "select", option_fields: [{ key: "values", label: "Allowed values", kind: "string-list" }] },
+  { type: "number", label: "Number", input: "number", option_fields: [] },
+];
+const DEFS = [
+  { id: 1, project_id: 1, key: "priority", name: "Priority", description: "", type: "enumeration", options: { values: ["Must", "Should", "Could"] }, position: 0 },
+  { id: 2, project_id: 1, key: "weight", name: "Weight", description: "", type: "number", options: { unit: "kg" }, position: 1 },
+];
 const projects = [{ id: 1, name: "Alpha", description: "first" }];
 const me = (over) => ({ id: 1, username: "elif", is_admin: false, memberships: [{ project_id: 1, role: "viewer" }], ...over });
 
@@ -84,10 +94,12 @@ describe("signed in", () => {
       "GET /auth/me": json(200, user),
       "GET /projects": json(200, projects),
       "GET /projects/1": json(200, projects[0]),
+      "GET /attribute-types": json(200, TYPES),
+      "GET /projects/1/attributes": json(200, DEFS),
       "GET /projects/1/modules": json(200, [{ id: 7, project_id: 1, name: "System" }]),
       "GET /modules/7/objects": json(200, [
-        { id: 1, display_id: "REQ-0001", heading: "Power", text: "", children: [
-          { id: 2, display_id: "REQ-0002", heading: "Battery", text: "", children: [] },
+        { id: 1, display_id: "REQ-0001", heading: "Power", text: "", attributes: { priority: "Must" }, children: [
+          { id: 2, display_id: "REQ-0002", heading: "Battery", text: "", attributes: { weight: 2.5 }, children: [] },
         ] },
       ]),
       "POST /auth/logout": json(204, null),
@@ -174,11 +186,59 @@ describe("signed in", () => {
     signedIn(me());
     mount("/projects/1/modules");
     await screen.findByText("Battery");
-    for (const h of ["Object tree", "ID", "Text", "Priority", "Status", "Flags"]) {
+    for (const h of ["Object tree", "ID", "Text", "Priority", "Weight", "Status", "Flags"]) { // Priority/Weight come from the definitions
       expect(screen.getByRole("columnheader", { name: h })).toBeInTheDocument();
     }
     expect(screen.getByText("1.1")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "User menu" })).toHaveTextContent("elif (Viewer)");
+  });
+
+  it("attribute columns follow the definitions and show typed values", async () => {
+    signedIn(me());
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    const power = screen.getByText("Power").closest("tr");
+    expect(within(power).getByText("Must")).toBeInTheDocument();
+    const battery = screen.getByText("Battery").closest("tr");
+    expect(within(battery).getByText("2.5 kg")).toBeInTheDocument(); // number with its unit
+  });
+
+  it("without definitions there are no attribute columns", async () => {
+    signedIn(me(), { "GET /projects/1/attributes": json(200, []) });
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    expect(screen.queryByRole("columnheader", { name: "Priority" })).not.toBeInTheDocument();
+  });
+
+  it("authors edit attribute values in place; only changed values are sent, empty clears", async () => {
+    const puts = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "PATCH /objects/2": json(200, {}),
+      "PUT /objects/2/attributes": (opts) => { puts.push(JSON.parse(opts.body)); return json(200, {}); },
+    });
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    await userEvent.click(screen.getByRole("button", { name: "Edit REQ-0002" }));
+    await userEvent.selectOptions(screen.getByLabelText("Priority"), "Should"); // select from the enumeration
+    const weight = screen.getByLabelText("Weight");
+    expect(weight).toHaveValue(2.5);
+    await userEvent.clear(weight); // clearing the weight
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(puts).toEqual([{ priority: "Should", weight: null }]));
+  });
+
+  it("nothing is sent for attributes when none was changed", async () => {
+    const puts = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "PATCH /objects/2": json(200, {}),
+      "PUT /objects/2/attributes": (opts) => { puts.push(opts.body); return json(200, {}); },
+    });
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    await userEvent.click(screen.getByRole("button", { name: "Edit REQ-0002" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument());
+    expect(puts).toEqual([]);
   });
 
   it("object detail shows text, links with a suspect tag and the AI panel", async () => {
@@ -194,6 +254,7 @@ describe("signed in", () => {
     expect(screen.getByText("suspect")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /AI assistant/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Classify" })).toBeDisabled();
+    expect(screen.getByText(/Priority:/)).toBeInTheDocument(); // attributes come from the definitions
   });
 
   it("change request and analysis screens render with a sample-data note", async () => {

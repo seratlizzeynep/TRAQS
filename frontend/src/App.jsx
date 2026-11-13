@@ -4,6 +4,7 @@ import TopBar from "./components/TopBar.jsx";
 import { useI18n } from "./i18n.jsx";
 import { NAV_ITEMS } from "./nav.js";
 import Administration from "./pages/Administration.jsx";
+import Attributes from "./pages/Attributes.jsx";
 import Login from "./pages/Login.jsx";
 import { AnalysisDashboard, ChangeRequest } from "./pages/Mockups.jsx";
 import ObjectDetail from "./pages/ObjectDetail.jsx";
@@ -40,7 +41,8 @@ export default function App() {
           <Route path="changes" element={<ChangeRequest />} />
           <Route path="analysis" element={<AnalysisDashboard />} />
           <Route path="admin" element={<Administration />} />
-          {NAV_ITEMS.filter((i) => !["modules", "changes", "analysis", "admin"].includes(i.key)).map((i) => (
+          <Route path="attributes" element={<Attributes />} />
+          {NAV_ITEMS.filter((i) => !["modules", "changes", "analysis", "admin", "attributes"].includes(i.key)).map((i) => (
             <Route key={i.key} path={i.path} element={<Placeholder titleKey={i.labelKey} />} />
           ))}
         </Route>

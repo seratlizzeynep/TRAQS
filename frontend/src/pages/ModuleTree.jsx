@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { del, get, patch, post } from "../api.js";
+import { del, get, patch, post, put } from "../api.js";
+import { inputFor, ValueDisplay } from "../attributes/inputs.jsx";
+import { useAttributes } from "../attributes/useAttributes.js";
 import { dropTarget } from "../dnd.js";
 import { useAuth } from "../auth.jsx";
 import { useI18n } from "../i18n.jsx";
@@ -43,7 +45,7 @@ export function zoneOf(clientY, rect) {
   return r < 0.25 ? "before" : r > 0.75 ? "after" : "child";
 }
 
-function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
+function ModuleTable({ module, tree, q, writable, definitions, types, onChanged, onError }) {
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState(new Set());
   const [adding, setAdding] = useState(false);
@@ -81,10 +83,20 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
   };
   const save = async (e) => {
     e.preventDefault();
-    const { id, heading: h, text: tx } = editing;
+    const { id, heading: h, text: tx, attrs, original } = editing;
     await patch(`/objects/${id}`, { heading: h, text: tx }).catch(onError);
+    // only attributes that were changed are sent; "" clears a value
+    const changed = {};
+    for (const d of definitions) {
+      if (attrs[d.key] !== original[d.key]) changed[d.key] = inputFor(d, types).parse(attrs[d.key]);
+    }
+    if (Object.keys(changed).length) await put(`/objects/${id}/attributes`, changed).catch(onError);
     setEditing(null);
     onChanged();
+  };
+  const startEdit = (node) => {
+    const raw = Object.fromEntries(definitions.map((d) => [d.key, inputFor(d, types).initial(node.attributes?.[d.key])]));
+    setEditing({ id: node.id, heading: node.heading, text: node.text, attrs: raw, original: raw });
   };
   const onEditKey = (e) => e.key === "Escape" && setEditing(null);
   const remove = async (node) => {
@@ -121,15 +133,15 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
         <table className="grid">
           <thead>
             <tr>
-              {["col.tree", "col.id", "col.text", "col.priority", "col.status", "col.flags"].map((k) => (
-                <th key={k} scope="col">{t(k)}</th>
-              ))}
+              {["col.tree", "col.id", "col.text"].map((k) => <th key={k} scope="col">{t(k)}</th>)}
+              {definitions.map((d) => <th key={`attr-${d.id}`} scope="col">{d.name}</th>)}
+              {["col.status", "col.flags"].map((k) => <th key={k} scope="col">{t(k)}</th>)}
               {writable && <th scope="col"><span className="sr-only">{t("admin.actions")}</span></th>}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr className="empty-row"><td colSpan={writable ? 7 : 6}>{t("modules.noObjects")}</td></tr>
+              <tr className="empty-row"><td colSpan={(writable ? 6 : 5) + definitions.length}>{t("modules.noObjects")}</td></tr>
             )}
             {rows.map(({ node, depth }) => {
               const has = node.children.length > 0;
@@ -174,7 +186,17 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
                       node.text
                     )}
                   </td>
-                  <td className="muted">—</td>
+                  {definitions.map((d) => {
+                    if (editing?.id !== node.id) {
+                      return <td key={d.id}><ValueDisplay def={d} types={types} value={node.attributes?.[d.key]} /></td>;
+                    }
+                    const { Editor } = inputFor(d, types);
+                    return (
+                      <td key={d.id}>
+                        <Editor def={d} label={d.name} value={editing.attrs[d.key]} onChange={(raw) => setEditing({ ...editing, attrs: { ...editing.attrs, [d.key]: raw } })} />
+                      </td>
+                    );
+                  })}
                   <td><span className="badge yellow">{t("status.notReviewed")}</span></td>
                   <td className="muted">—</td>
                   {writable && (
@@ -189,7 +211,7 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
                       ) : (
                         <>
                           <button key="edit" type="button" aria-label={`${t("common.edit")} ${node.display_id}`} title={t("common.edit")}
-                            onClick={() => setEditing({ id: node.id, heading: node.heading, text: node.text })}>✎</button>{" "}
+                            onClick={() => startEdit(node)}>✎</button>{" "}
                           <button key="delete" type="button" className="danger" aria-label={`${t("modules.delete")} ${node.display_id}`} title={t("modules.delete")} onClick={() => remove(node)}>✕</button>
                         </>
                       )}
@@ -214,6 +236,7 @@ export default function ModuleTree() {
   const q = params.get("q") ?? "";
   const writable = can(roleIn(user, projectId), "write");
 
+  const { types, definitions } = useAttributes(projectId);
   const [modules, setModules] = useState(null);
   const [trees, setTrees] = useState({});
   const [moduleName, setModuleName] = useState("");
@@ -254,7 +277,7 @@ export default function ModuleTree() {
         <p>{t("modules.empty")}</p>
       ) : (
         modules.map((m) => (
-          <ModuleTable key={m.id} module={m} tree={trees[m.id] ?? []} q={q} writable={writable} onChanged={load} onError={fail} />
+          <ModuleTable key={m.id} module={m} tree={trees[m.id] ?? []} q={q} writable={writable} definitions={definitions} types={types} onChanged={load} onError={fail} />
         ))
       )}
     </section>

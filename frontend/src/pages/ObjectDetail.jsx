@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError, get } from "../api.js";
+import { ValueDisplay } from "../attributes/inputs.jsx";
+import { useAttributes } from "../attributes/useAttributes.js";
 import { useI18n } from "../i18n.jsx";
 
 // S4 (object detail) with S5 (AI assistant panel). The AI actions are not available yet.
 export default function ObjectDetail() {
   const { t } = useI18n();
   const { projectId, objectId } = useParams();
+  const { types, definitions } = useAttributes(projectId);
   const [state, setState] = useState({ loading: true });
 
   useEffect(() => {
@@ -48,7 +51,12 @@ export default function ObjectDetail() {
       <div className="cols">
         <div>
           <div className="card"><div className="label">{t("detail.text")}</div>{obj.heading && <strong>{obj.heading}</strong>}{obj.text && <div>{obj.text}</div>}</div>
-          <div className="card"><div className="label">{t("detail.attributes")}</div>{t("col.priority")}: — · Level: — · Verification: —</div>
+          <div className="card">
+            <div className="label">{t("detail.attributes")}</div>
+            {definitions.length === 0 ? <span className="muted">{t("detail.noAttributes")}</span> : definitions.map((d) => (
+              <div key={d.id}>{d.name}: <ValueDisplay def={d} types={types} value={obj.attributes?.[d.key]} /></div>
+            ))}
+          </div>
           <div className="card">
             <div className="label">{t("detail.links")}</div>
             {links.length === 0 ? <span className="muted">{t("detail.noLinks")}</span> : links.map((l) => (

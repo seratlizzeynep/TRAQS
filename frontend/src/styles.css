@@ -131,3 +131,10 @@ button.danger:hover:not(:disabled) { background: var(--red-bg); }
 /* S3 table: keep the Text column readable (also while editing) */
 .grid th:nth-child(3), .grid td:nth-child(3) { min-width: 18rem; }
 .grid td.tree input { width: 13rem; }
+
+/* attribute definition form */
+.form-grid { display: grid; gap: .6rem; max-width: 34rem; }
+.form-grid label { display: grid; gap: .2rem; }
+.form-grid label.opt:has(input[type="checkbox"]) { display: flex; gap: .4rem; align-items: center; }
+.form-grid textarea { font: inherit; padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 6px; }
+.grid td input[type="number"], .grid td select, .grid td input[type="date"] { max-width: 11rem; }
