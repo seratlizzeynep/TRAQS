@@ -185,4 +185,7 @@ export default {
   "linktype.Verifies.inverse": "Verified by",
   "linktype.Refers": "Refers",
   "linktype.Refers.inverse": "Referred by",
+  "link.gap": "gap",
+  "link.violation": "rule broken",
+  "link.rule": "Rule",
 };

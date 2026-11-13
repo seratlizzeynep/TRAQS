@@ -6,7 +6,7 @@ import { useI18n } from "../i18n.jsx";
 // Links of one object (S4): both directions, also across modules, with create and delete.
 // The available link types come from the server (GET /link-types, config/link-types.json).
 export default function LinksCard({ obj, projectId, writable }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [links, setLinks] = useState(null);
   const [types, setTypes] = useState([]);
   const [message, setMessage] = useState(null);
@@ -33,6 +33,9 @@ export default function LinksCard({ obj, projectId, writable }) {
   }, [q, target, projectId, obj.id]);
 
   const typeName = type || types[0]?.name || "";
+  // the rule text in the user's language when the configuration has one, otherwise the default text
+  const rule = types.find((x) => x.name === typeName)?.rule;
+  const ruleText = rule?.descriptions?.[lang] ?? rule?.description;
   const rejected = (e) => setMessage(`${t("link.rejected")} ${e.message}`);
 
   const add = async (e) => {
@@ -84,6 +87,8 @@ export default function LinksCard({ obj, projectId, writable }) {
                   </>
                 )}
                 {l.suspect ? <> <span className="badge red">{t("detail.suspect")}</span></> : null}
+                {l.rule?.status === "gap" && <> <span className="badge yellow" title={l.rule.message}>{t("link.gap")}</span></>}
+                {l.rule?.status === "violation" && <> <span className="badge red" title={l.rule.message}>{t("link.violation")}</span></>}
                 {cfg?.informative && <> <span className="badge gray">{t("link.informative")}</span></>}
                 {writable && (
                   <button type="button" className="danger" aria-label={`${t("link.delete")} ${label} ${other.display_id}`} title={t("link.delete")} onClick={() => remove(l)}>✕</button>
@@ -123,6 +128,7 @@ export default function LinksCard({ obj, projectId, writable }) {
             </span>
           )}
           <button className="primary" type="submit" disabled={!target}>{t("link.add")}</button>
+          {ruleText && <p className="muted rule-hint">{t("link.rule")}: {ruleText}</p>}
         </form>
       )}
     </div>

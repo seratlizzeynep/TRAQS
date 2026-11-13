@@ -185,4 +185,7 @@ export default {
   "linktype.Verifies.inverse": "Şunun tarafından doğrulanır",
   "linktype.Refers": "Atıf yapar",
   "linktype.Refers.inverse": "Atıf alır",
+  "link.gap": "boşluk",
+  "link.violation": "kural ihlali",
+  "link.rule": "Kural",
 };

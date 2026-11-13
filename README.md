@@ -87,7 +87,7 @@ cd frontend && npm test
 | `TRAQS_JWT_SECRET` | random per start | Secret used to sign tokens. Set it, or tokens become invalid on restart |
 | `TRAQS_ADMIN_USER`, `TRAQS_ADMIN_PASSWORD` | none | Creates the first administrator when no users exist |
 | `TRAQS_DATABASE` | `traqs.db` | SQLite file |
-| `TRAQS_LINK_TYPES` | `backend/config/link-types.json` | The allowed link types, with their inverse labels |
+| `TRAQS_LINK_RULES` | `backend/config/link-rules.json` | Link types and link rules (one file) |
 | `TRAQS_DEFAULT_ATTRIBUTES` | `backend/config/default-attributes.json` | Attributes every new project starts with. Empty value = none |
 | `PORT` | `8000` | API port |
 | `TRAQS_SESSION_TIMEOUT_MIN` | `30` | Inactivity timeout of a session |
@@ -104,7 +104,7 @@ Every call is checked against the user's role in the project.
 | Projects | `/projects`, `/projects/{id}`, `/projects/{id}/members/{userId}` |
 | Modules | `/projects/{id}/modules`, `/modules/{id}` |
 | Objects | `/modules/{id}/objects` (tree or `?flat=true`), `/objects/{id}`, `POST /objects/{id}/move` |
-| Links | `/link-types`, `/objects/{id}/links` (create with `type`), `DELETE /links/{id}` |
+| Links | `/link-types`, `/objects/{id}/links` (create with `type`), `DELETE /links/{id}`, `/projects/{id}/link-issues` |
 | Attributes | `/attribute-types`, `/projects/{id}/attributes`, `/attributes/{id}`, `PUT /objects/{id}/attributes` |
 | Users | `/users`, `/users/{id}/unlock` |
 
@@ -125,12 +125,26 @@ every project can change, delete or add attributes on the **Attributes** screen.
 - Values are validated against their type; a wrong value is rejected with `422`, and options cannot be
   changed in a way that would invalidate stored values.
 
-## Link types (configuration)
+## Link types and link rules (configuration)
 
-The allowed link types are listed in [`backend/config/link-types.json`](backend/config/link-types.json)
-(name, inverse label shown at the target, description, `informative` flag). Edit the file to change them;
-no code is involved. A link goes from a source to a target in the same project, in any module, never to
-the object itself; the same pair may be linked with several types, but not twice with the same type.
+Which links exist and which are allowed is described in **one file**,
+[`backend/config/link-rules.json`](backend/config/link-rules.json); no code is involved.
+
+- `types`: the link types (name, inverse label shown at the target, description, `informative`).
+- `kind_attribute`: the attribute that says what kind an object is. The shipped files use **Level**
+  (UR, SR, SW, DI = design item, TC = test case).
+- `rules`: per type, the allowed `[from, to]` kind pairs (`"any"` for none). A side can be a kind, a group
+  (`groups`, e.g. `requirement`) or `*`. `acyclic` forbids cycles; `allow_skip_levels` allows a link that
+  skips one of the `levels` and reports it as a **gap**.
+
+Shipped rules: Derives UR→SR and SR→SW (UR→SW is a gap, no cycles); Satisfies SW→SR, SR→UR and DI→requirement;
+Verifies TC→requirement only; Refers any→any (informative, not counted in coverage).
+
+A link that breaks a rule is refused with `422` and the message names the rule and what is allowed.
+Links stay inside one project, never point to the object itself, and the same pair may have several types
+but not the same type twice. If a rule needs the Level of an object that has none, the link is refused
+(`unknown_kind` in the file switches this to "allow"). When a Level is changed later, links that no longer
+fit are listed by `GET /projects/{id}/link-issues`, together with the gaps.
 
 ## Roles
 

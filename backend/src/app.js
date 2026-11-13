@@ -37,12 +37,12 @@ function parentId(body) {
 }
 
 // Internal columns (ID counter, soft-delete marker) are removed from every JSON response below.
-// options: { jwtSecret (required), now, sessionTimeoutMs, maxFailedLogins, lockMs, defaultAttributes, linkTypes }
+// options: { jwtSecret (required), now, sessionTimeoutMs, maxFailedLogins, lockMs, defaultAttributes, linkRules }
 export function createApp(db, options = {}) {
   if (!options.jwtSecret) throw new Error("createApp requires a jwtSecret");
   const auth = createAuth(db, options);
   const attrs = createAttributeService(db, { defaults: options.defaultAttributes ?? [] });
-  const links = createLinkService(db, { types: options.linkTypes ?? [] });
+  const links = createLinkService(db, { config: options.linkRules ?? {}, attrs });
   const { access, canSeeProject: visibleProject } = auth;
   const app = express();
   app.use(express.json());
