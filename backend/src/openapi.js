@@ -133,7 +133,7 @@ export const openapi = {
       },
       Member: {
         type: "object",
-        properties: { user_id: { type: "integer" }, role: ref("Role") },
+        properties: { user_id: { type: "integer" }, username: { type: "string" }, role: ref("Role") },
       },
       BlacklistEntry: {
         type: "object",
@@ -179,6 +179,13 @@ export const openapi = {
     "/users/{id}/unlock": {
       post: op("Unlock a locked account (administrator)", "Users", { params: [idParam], responses: ok("User", ref("User")) }),
     },
+    "/users/{id}/password": {
+      put: op("Set a new password for a user (administrator); unlocks the account and ends its sessions", "Users", {
+        params: [idParam],
+        requestBody: body({ type: "object", required: ["password"], properties: { password: { type: "string", minLength: 8, format: "password" } } }),
+        responses: ok("Password changed", null, "204"),
+      }),
+    },
     "/projects/{id}/members": {
       get: op("Members and roles of a project", "Projects", { params: [idParam], responses: ok("Members", arr(ref("Member"))) }),
     },
@@ -219,6 +226,26 @@ export const openapi = {
         params: [idParam],
         requestBody: body(ref("ProjectInput")),
         responses: ok("Created", ref("Module"), "201"),
+      }),
+    },
+    "/projects/{id}/search": {
+      get: op("Search objects of the project by ID and text (deleted objects are not returned)", "Projects", {
+        params: [
+          idParam,
+          { name: "q", in: "query", required: true, schema: { type: "string" }, description: "e.g. REQ-0003 or a word" },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20, maximum: 100 } },
+        ],
+        responses: ok("Matches", arr({
+          type: "object",
+          properties: {
+            id: { type: "integer" },
+            display_id: { type: "string" },
+            heading: { type: "string" },
+            text: { type: "string" },
+            module_id: { type: "integer" },
+            module_name: { type: "string" },
+          },
+        })),
       }),
     },
     "/projects/{id}/id-blacklist": {

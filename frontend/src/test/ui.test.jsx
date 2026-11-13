@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -127,6 +127,40 @@ describe("signed in", () => {
     expect(screen.queryByText("Battery")).not.toBeInTheDocument();
   });
 
+  it("top-bar search lists matches of the current project and opens the object detail", async () => {
+    signedIn(me(), {
+      "GET /projects/1/search?q=REQ-0002&limit=10": json(200, [
+        { id: 2, display_id: "REQ-0002", heading: "Battery", text: "Lasts 8 h", module_id: 7, module_name: "System" },
+      ]),
+      "GET /objects/2": json(200, { id: 2, display_id: "REQ-0002", heading: "Battery", text: "Lasts 8 h", module_id: 7 }),
+      "GET /objects/2/links": json(200, []),
+    });
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    await userEvent.type(screen.getByRole("searchbox"), "REQ-0002");
+    const list = await screen.findByRole("list", { name: "Search results" });
+    await userEvent.click(within(list).getByRole("button", { name: /REQ-0002/ }));
+    expect(await screen.findByRole("heading", { name: /S4 · REQ-0002/ })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Search results" })).not.toBeInTheDocument();
+  });
+
+  it("top-bar search says so when nothing matches, and does not search without a project", async () => {
+    signedIn(me(), { "GET /projects/1/search?q=zzz&limit=10": json(200, []) });
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    await userEvent.type(screen.getByRole("searchbox"), "zzz");
+    expect(await screen.findByText("No matching requirements.")).toBeInTheDocument();
+  });
+
+  it("no search request is sent on the project list (no current project)", async () => {
+    signedIn(me());
+    mount("/projects");
+    await screen.findByRole("heading", { name: "Projects" });
+    await userEvent.type(screen.getByRole("searchbox"), "abc");
+    await new Promise((r) => setTimeout(r, 350));
+    expect(global.fetch.mock.calls.some(([u]) => String(u).includes("/search"))).toBe(false);
+  });
+
   it("search in the top bar filters the tree", async () => {
     signedIn(me());
     mount("/projects/1/modules");
@@ -170,6 +204,110 @@ describe("signed in", () => {
     mount("/projects/1/analysis");
     expect(await screen.findByRole("heading", { name: /Analysis dashboard/ })).toBeInTheDocument();
     expect(screen.getByText("92 %")).toBeInTheDocument();
+  });
+
+  it("authors can drag a row onto another one and the move is sent to the API", async () => {
+    const moves = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "GET /modules/7/objects": json(200, [
+        { id: 1, display_id: "REQ-0001", heading: "Power", text: "", parent_id: null, children: [] },
+        { id: 2, display_id: "REQ-0002", heading: "Display", text: "", parent_id: null, children: [] },
+      ]),
+      "POST /objects/2/move": (opts) => { moves.push(JSON.parse(opts.body)); return json(200, {}); },
+    });
+    mount("/projects/1/modules");
+    const rowOf = (name) => screen.getByText(name).closest("tr");
+    await screen.findByText("Display");
+    const dt = { setData() {}, effectAllowed: "" };
+    fireEvent.dragStart(rowOf("Display"), { dataTransfer: dt });
+    fireEvent.dragOver(rowOf("Power"), { dataTransfer: dt });
+    fireEvent.drop(rowOf("Power"), { dataTransfer: dt });
+    await waitFor(() => expect(moves).toEqual([{ parent_id: 1, position: null }]));
+  });
+
+  it("authors add an object with heading and text", async () => {
+    const posts = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "POST /modules/7/objects": (opts) => { posts.push(JSON.parse(opts.body)); return json(201, { id: 9 }); },
+    });
+    mount("/projects/1/modules");
+    await userEvent.click(await screen.findByRole("button", { name: "+ Object" }));
+    await userEvent.type(screen.getByLabelText("Heading"), "Alarm");
+    await userEvent.type(screen.getByLabelText("Text (optional)"), "The system shall raise an alarm.");
+    await userEvent.click(screen.getByRole("button", { name: "Add object" }));
+    await waitFor(() => expect(posts).toEqual([{ heading: "Alarm", text: "The system shall raise an alarm." }]));
+  });
+
+  it("authors delete an object after confirming; cancelling does nothing", async () => {
+    const deleted = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "DELETE /objects/2": () => { deleted.push(2); return json(204, null); },
+    });
+    const confirm = vi.spyOn(window, "confirm");
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    confirm.mockReturnValueOnce(false);
+    await userEvent.click(screen.getByRole("button", { name: "Delete REQ-0002" }));
+    expect(deleted).toEqual([]);
+    confirm.mockReturnValueOnce(true);
+    await userEvent.click(screen.getByRole("button", { name: "Delete REQ-0002" }));
+    await waitFor(() => expect(deleted).toEqual([2]));
+    expect(confirm.mock.calls[1][0]).toMatch(/REQ-0002/);
+  });
+
+  it("authors edit heading and text of an object in place", async () => {
+    const patches = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "PATCH /objects/2": (opts) => { patches.push(JSON.parse(opts.body)); return json(200, {}); },
+    });
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    await userEvent.click(screen.getByRole("button", { name: "Edit REQ-0002" }));
+    const heading = screen.getByLabelText("Heading");
+    expect(heading).toHaveValue("Battery");
+    await userEvent.clear(heading);
+    await userEvent.type(heading, "Battery life");
+    await userEvent.type(screen.getByLabelText("Text (optional)"), "At least 8 h.");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patches).toEqual([{ heading: "Battery life", text: "At least 8 h." }]));
+    expect(screen.queryByLabelText("Heading")).not.toBeInTheDocument(); // editing ended
+  });
+
+  it("cancel and Escape leave the object unchanged", async () => {
+    const patches = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "PATCH /objects/2": (opts) => { patches.push(opts.body); return json(200, {}); },
+    });
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    await userEvent.click(screen.getByRole("button", { name: "Edit REQ-0002" }));
+    await userEvent.type(screen.getByLabelText("Heading"), "x");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit REQ-0002" }));
+    await userEvent.type(screen.getByLabelText("Heading"), "y{Escape}");
+    expect(screen.queryByLabelText("Heading")).not.toBeInTheDocument();
+    expect(patches).toEqual([]);
+  });
+
+  it("viewers see no edit buttons", async () => {
+    signedIn(me());
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    expect(screen.queryByRole("button", { name: /^Edit REQ/ })).not.toBeInTheDocument();
+  });
+
+  it("viewers see no delete buttons", async () => {
+    signedIn(me());
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    expect(screen.queryByRole("button", { name: /^Delete/ })).not.toBeInTheDocument();
+  });
+
+  it("viewers cannot drag rows", async () => {
+    signedIn(me());
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    expect(screen.getByText("Battery").closest("tr")).not.toHaveAttribute("draggable", "true");
   });
 
   it("a user without access to the project gets a not-found message", async () => {

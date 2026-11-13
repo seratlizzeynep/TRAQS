@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { get, post } from "../api.js";
+import { del, get, patch, post } from "../api.js";
+import { dropTarget } from "../dnd.js";
 import { useAuth } from "../auth.jsx";
 import { useI18n } from "../i18n.jsx";
 import { can, roleIn } from "../permissions.js";
@@ -35,11 +36,22 @@ export function visibleRows(nodes, collapsed, depth = 0, out = []) {
   return out;
 }
 
+// Where on a row the pointer is: top quarter = before, bottom quarter = after, middle = as child.
+export function zoneOf(clientY, rect) {
+  if (!rect || !rect.height) return "child";
+  const r = (clientY - rect.top) / rect.height;
+  return r < 0.25 ? "before" : r > 0.75 ? "after" : "child";
+}
+
 function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState(new Set());
   const [adding, setAdding] = useState(false);
   const [heading, setHeading] = useState("");
+  const [text, setText] = useState("");
+  const [editing, setEditing] = useState(null); // { id, heading, text }
+  const [dragId, setDragId] = useState(null);
+  const [hover, setHover] = useState(null); // { id, zone }
   const numbers = useMemo(() => outlineNumbers(tree), [tree]);
   const rows = visibleRows(filterTree(tree, q), collapsed);
 
@@ -50,9 +62,34 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
   };
   const add = async (e) => {
     e.preventDefault();
-    await post(`/modules/${module.id}/objects`, { heading }).catch(onError);
+    await post(`/modules/${module.id}/objects`, { heading, text }).catch(onError);
     setHeading("");
+    setText("");
     setAdding(false);
+    onChanged();
+  };
+  const endDrag = () => { setDragId(null); setHover(null); };
+  const onDrop = async (e, targetId) => {
+    e.preventDefault();
+    const zone = zoneOf(e.clientY, e.currentTarget.getBoundingClientRect());
+    const move = dragId === null ? null : dropTarget(tree, dragId, targetId, zone);
+    const id = dragId;
+    endDrag();
+    if (!move) return;
+    await post(`/objects/${id}/move`, move).catch(onError);
+    onChanged();
+  };
+  const save = async (e) => {
+    e.preventDefault();
+    const { id, heading: h, text: tx } = editing;
+    await patch(`/objects/${id}`, { heading: h, text: tx }).catch(onError);
+    setEditing(null);
+    onChanged();
+  };
+  const onEditKey = (e) => e.key === "Escape" && setEditing(null);
+  const remove = async (node) => {
+    if (!window.confirm(`${node.display_id} ${node.heading}\n\n${t("modules.confirmDelete")}`)) return;
+    await del(`/objects/${node.id}`).catch(onError);
     onChanged();
   };
   const unavailable = { "aria-disabled": true, title: t("common.unavailable"), onClick: (e) => e.preventDefault() };
@@ -75,9 +112,11 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
       {writable && adding && (
         <form onSubmit={add} className="inline-form">
           <input aria-label={t("modules.objectHeading")} placeholder={t("modules.objectHeading")} value={heading} onChange={(e) => setHeading(e.target.value)} autoFocus />
+          <input aria-label={t("modules.objectText")} placeholder={t("modules.objectText")} value={text} onChange={(e) => setText(e.target.value)} style={{ flexBasis: "24rem" }} />
           <button className="primary" type="submit">{t("modules.addObject")}</button>
         </form>
       )}
+      {writable && <form id="edit-object" onSubmit={save} />}
       <div className="table-wrap">
         <table className="grid">
           <thead>
@@ -85,17 +124,31 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
               {["col.tree", "col.id", "col.text", "col.priority", "col.status", "col.flags"].map((k) => (
                 <th key={k} scope="col">{t(k)}</th>
               ))}
+              {writable && <th scope="col"><span className="sr-only">{t("admin.actions")}</span></th>}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr className="empty-row"><td colSpan={6}>{t("modules.noObjects")}</td></tr>
+              <tr className="empty-row"><td colSpan={writable ? 7 : 6}>{t("modules.noObjects")}</td></tr>
             )}
             {rows.map(({ node, depth }) => {
               const has = node.children.length > 0;
               const open = !collapsed.has(node.id);
               return (
-                <tr key={node.id}>
+                <tr
+                  key={node.id}
+                  draggable={writable && editing?.id !== node.id}
+                  className={hover?.id === node.id ? `drop-${hover.zone}` : undefined}
+                  onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(node.id)); setDragId(node.id); }}
+                  onDragOver={(e) => {
+                    if (dragId === null || dragId === node.id) return;
+                    e.preventDefault();
+                    const zone = zoneOf(e.clientY, e.currentTarget.getBoundingClientRect());
+                    if (hover?.id !== node.id || hover.zone !== zone) setHover({ id: node.id, zone });
+                  }}
+                  onDragEnd={endDrag}
+                  onDrop={(e) => onDrop(e, node.id)}
+                >
                   <td className="tree" style={{ paddingLeft: `${0.6 + depth * 1.4}rem` }}>
                     {has ? (
                       <button type="button" className="twisty" aria-expanded={open}
@@ -105,13 +158,43 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
                       <span className="twisty" />
                     )}
                     <span className="num">{numbers.get(node.id)}</span>
-                    <span>{node.heading}</span>
+                    {editing?.id === node.id ? (
+                      <input form="edit-object" aria-label={t("modules.objectHeading")} value={editing.heading} autoFocus onKeyDown={onEditKey}
+                        onChange={(e) => setEditing({ ...editing, heading: e.target.value })} />
+                    ) : (
+                      <span>{node.heading}</span>
+                    )}
                   </td>
-                  <td><Link to={`../objects/${node.id}`}>{node.display_id}</Link></td>
-                  <td>{node.text}</td>
+                  <td style={{ whiteSpace: "nowrap" }}><Link to={`../objects/${node.id}`}>{node.display_id}</Link></td>
+                  <td>
+                    {editing?.id === node.id ? (
+                      <input form="edit-object" aria-label={t("modules.objectText")} value={editing.text} onKeyDown={onEditKey} style={{ width: "100%" }}
+                        onChange={(e) => setEditing({ ...editing, text: e.target.value })} />
+                    ) : (
+                      node.text
+                    )}
+                  </td>
                   <td className="muted">—</td>
                   <td><span className="badge yellow">{t("status.notReviewed")}</span></td>
                   <td className="muted">—</td>
+                  {writable && (
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {/* distinct keys: otherwise React turns the clicked Edit button into the submit button
+                          and the browser submits the form right after the click */}
+                      {editing?.id === node.id ? (
+                        <>
+                          <button key="save" className="primary" type="submit" form="edit-object">{t("common.save")}</button>{" "}
+                          <button key="cancel" type="button" onClick={() => setEditing(null)}>{t("common.cancel")}</button>
+                        </>
+                      ) : (
+                        <>
+                          <button key="edit" type="button" aria-label={`${t("common.edit")} ${node.display_id}`} title={t("common.edit")}
+                            onClick={() => setEditing({ id: node.id, heading: node.heading, text: node.text })}>✎</button>{" "}
+                          <button key="delete" type="button" className="danger" aria-label={`${t("modules.delete")} ${node.display_id}`} title={t("modules.delete")} onClick={() => remove(node)}>✕</button>
+                        </>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}
