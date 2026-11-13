@@ -84,6 +84,8 @@ export default function LinksCard({ obj, projectId, writable }) {
                   </>
                 )}
                 {l.suspect ? <> <span className="badge red">{t("detail.suspect")}</span></> : null}
+                {l.rule?.status === "gap" && <> <span className="badge yellow" title={l.rule.message}>{t("link.gap")}</span></>}
+                {l.rule?.status === "violation" && <> <span className="badge red" title={l.rule.message}>{t("link.violation")}</span></>}
                 {cfg?.informative && <> <span className="badge gray">{t("link.informative")}</span></>}
                 {writable && (
                   <button type="button" className="danger" aria-label={`${t("link.delete")} ${label} ${other.display_id}`} title={t("link.delete")} onClick={() => remove(l)}>✕</button>
@@ -123,6 +125,9 @@ export default function LinksCard({ obj, projectId, writable }) {
             </span>
           )}
           <button className="primary" type="submit" disabled={!target}>{t("link.add")}</button>
+          {types.find((x) => x.name === typeName)?.rule?.description && (
+            <p className="muted rule-hint">{t("link.rule")}: {types.find((x) => x.name === typeName).rule.description}</p>
+          )}
         </form>
       )}
     </div>

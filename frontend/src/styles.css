@@ -147,3 +147,5 @@ button.danger:hover:not(:disabled) { background: var(--red-bg); }
 .link-form .picker input { width: 100%; }
 .link-form .picker .results { top: 105%; }
 .link-form .chosen { flex: 1 1 14rem; }
+
+.rule-hint { flex-basis: 100%; margin: 0; font-size: .85rem; }
