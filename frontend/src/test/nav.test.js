@@ -7,7 +7,12 @@ const keys = (role) => navFor(role).map((i) => i.key);
 
 describe("role based navigation", () => {
   it("admin sees everything", () => {
-    expect(keys("admin")).toEqual(["modules", "traceability", "changes", "baselines", "tests", "analysis", "importExport", "admin"]);
+    expect(keys("admin")).toEqual(["modules", "traceability", "changes", "baselines", "tests", "analysis", "importExport", "attributes", "admin"]);
+  });
+  it("authors define attributes; viewers and reviewers do not", () => {
+    expect(keys("author")).toContain("attributes");
+    expect(keys("viewer")).not.toContain("attributes");
+    expect(keys("reviewer")).not.toContain("attributes");
   });
   it("author may import/export but not administer", () => {
     expect(keys("author")).toContain("importExport");

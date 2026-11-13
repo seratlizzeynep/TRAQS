@@ -40,6 +40,7 @@ export const openapi = {
     { name: "Meta" },
     { name: "Auth" },
     { name: "Users" },
+    { name: "Attributes" },
   ],
   components: {
     securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" } },
@@ -76,6 +77,7 @@ export const openapi = {
           position: { type: "integer", description: "0-based index among siblings" },
           heading: { type: "string" },
           text: { type: "string" },
+          attributes: ref("AttributeValues"),
         },
       },
       ObjectNode: {
@@ -134,6 +136,45 @@ export const openapi = {
       Member: {
         type: "object",
         properties: { user_id: { type: "integer" }, username: { type: "string" }, role: ref("Role") },
+      },
+      AttributeType: {
+        type: "object",
+        properties: {
+          type: { type: "string", example: "number" },
+          label: { type: "string" },
+          input: { type: "string", enum: ["text", "number", "select", "date"] },
+          option_fields: arr({ type: "object", properties: { key: { type: "string" }, label: { type: "string" }, kind: { type: "string" } } }),
+        },
+      },
+      AttributeDefinition: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          project_id: { type: "integer" },
+          key: { type: "string", example: "priority" },
+          name: { type: "string" },
+          description: { type: "string" },
+          type: { type: "string", example: "enumeration" },
+          options: { type: "object", example: { values: ["Must", "Should", "Could"] } },
+          position: { type: "integer" },
+        },
+      },
+      AttributeDefinitionInput: {
+        type: "object",
+        required: ["name", "type"],
+        properties: {
+          name: { type: "string" },
+          key: { type: "string", description: "Optional; derived from the name when omitted" },
+          description: { type: "string" },
+          type: { type: "string" },
+          options: { type: "object" },
+        },
+      },
+      AttributeValues: {
+        type: "object",
+        additionalProperties: true,
+        description: "Map of attribute key to value; null clears a value",
+        example: { priority: "Must", weight: 3.5 },
       },
       BlacklistEntry: {
         type: "object",
@@ -226,6 +267,46 @@ export const openapi = {
         params: [idParam],
         requestBody: body(ref("ProjectInput")),
         responses: ok("Created", ref("Module"), "201"),
+      }),
+    },
+    "/attribute-types": {
+      get: op("Registered attribute types and the options each one accepts", "Attributes", { responses: ok("Types", arr(ref("AttributeType"))) }),
+    },
+    "/projects/{id}/attributes": {
+      get: op("Attribute definitions of a project", "Attributes", { params: [idParam], responses: ok("Definitions", arr(ref("AttributeDefinition"))) }),
+      post: op("Define a typed attribute (invalid options are rejected)", "Attributes", {
+        params: [idParam],
+        requestBody: body(ref("AttributeDefinitionInput")),
+        responses: ok("Created", ref("AttributeDefinition"), "201"),
+      }),
+    },
+    "/projects/{id}/attributes/defaults": {
+      post: op("Add the configured default attributes the project does not have yet", "Attributes", {
+        params: [idParam],
+        responses: ok("Added definitions", arr(ref("AttributeDefinition")), "201"),
+      }),
+    },
+    "/projects/{id}/attributes/order": {
+      put: op("Set the order of the attributes (all ids, in the new order)", "Attributes", {
+        params: [idParam],
+        requestBody: body({ type: "object", required: ["ids"], properties: { ids: arr({ type: "integer" }) } }),
+        responses: ok("Definitions", arr(ref("AttributeDefinition"))),
+      }),
+    },
+    "/attributes/{id}": {
+      get: op("Read an attribute definition", "Attributes", { params: [idParam], responses: ok("Definition", ref("AttributeDefinition")) }),
+      patch: op("Change name, description or options (type and key are fixed; stored values must stay valid)", "Attributes", {
+        params: [idParam],
+        requestBody: body({ type: "object", properties: { name: { type: "string" }, description: { type: "string" }, options: { type: "object" } } }),
+        responses: ok("Definition", ref("AttributeDefinition")),
+      }),
+      delete: op("Delete a definition together with its values", "Attributes", { params: [idParam], responses: ok("Deleted", null, "204") }),
+    },
+    "/objects/{id}/attributes": {
+      put: op("Set or clear attribute values of an object (validated against the attribute types)", "Attributes", {
+        params: [idParam],
+        requestBody: body(ref("AttributeValues")),
+        responses: ok("Object", ref("Object")),
       }),
     },
     "/projects/{id}/search": {

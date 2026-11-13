@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Priority",
+    "description": "How important the requirement is (MoSCoW).",
+    "type": "enumeration",
+    "options": { "values": ["Must", "Should", "Could"] }
+  },
+  {
+    "name": "Level",
+    "description": "Requirement level.",
+    "type": "enumeration",
+    "options": { "values": ["UR", "SR", "SW"] }
+  },
+  {
+    "name": "Verification",
+    "description": "How the requirement is verified.",
+    "type": "enumeration",
+    "options": { "values": ["T", "I", "D", "A"] }
+  }
+]

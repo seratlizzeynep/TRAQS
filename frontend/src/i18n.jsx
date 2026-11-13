@@ -22,7 +22,7 @@ export function detectLanguage() {
   return supported(nav) ? nav : "en";
 }
 
-const I18nContext = createContext({ lang: "en", setLang: () => {}, t: (k) => en[k] ?? k });
+const I18nContext = createContext({ lang: "en", setLang: () => {}, t: (k, fallback) => en[k] ?? fallback ?? k });
 
 export function I18nProvider({ children, initialLang }) {
   const [lang, setLangState] = useState(() => (supported(initialLang) ? initialLang : detectLanguage()));
@@ -37,7 +37,7 @@ export function I18nProvider({ children, initialLang }) {
 
   const value = useMemo(() => {
     const dict = dictionaries[lang] ?? en;
-    return { lang, setLang, t: (key) => dict[key] ?? en[key] ?? key };
+    return { lang, setLang, t: (key, fallback) => dict[key] ?? en[key] ?? fallback ?? key };
   }, [lang, setLang]);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
