@@ -107,4 +107,7 @@ export default {
   "an.type": "Type",
   "an.summary": "AI narrative summary",
   "an.draft": "(draft, to be reviewed)",
+  "search.results": "Search results",
+  "search.none": "No matching requirements.",
+  "search.searching": "Searching…",
 };

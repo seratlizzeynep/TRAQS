@@ -107,4 +107,7 @@ export default {
   "an.type": "Tür",
   "an.summary": "Yapay zekâ özeti",
   "an.draft": "(taslak, incelenecek)",
+  "search.results": "Arama sonuçları",
+  "search.none": "Eşleşen gereksinim yok.",
+  "search.searching": "Aranıyor…",
 };

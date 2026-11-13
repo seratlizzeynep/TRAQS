@@ -275,6 +275,27 @@ export function createApp(db, options = {}) {
     );
   });
 
+  // Search objects of ONE project by ID and text (heading or text). Soft-deleted objects are never returned.
+  api.get("/projects/:id/search", (req, res) => {
+    const p = find("projects", "Project", id(req));
+    access(req, p.id, "read");
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (q === "" || q.length > 200) throw new HttpError(422, "q is required (1-200 characters)");
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 20, 1), 100);
+    const like = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+    const rows = db
+      .prepare(
+        `SELECT o.id, o.display_id, o.heading, o.text, o.module_id, m.name AS module_name
+         FROM objects o JOIN modules m ON m.id = o.module_id
+         WHERE m.project_id = ? AND o.deleted_at IS NULL
+           AND (o.display_id LIKE ? ESCAPE '\\' OR o.heading LIKE ? ESCAPE '\\' OR o.text LIKE ? ESCAPE '\\')
+         ORDER BY (UPPER(o.display_id) = UPPER(?)) DESC, o.display_id
+         LIMIT ?`
+      )
+      .all(p.id, like, like, like, q, limit);
+    res.json(rows);
+  });
+
   // ----------------------------------------------------------- links
   api.post("/objects/:id/links", (req, res) => {
     const src = find("objects", "Object", id(req));

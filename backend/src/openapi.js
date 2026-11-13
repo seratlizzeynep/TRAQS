@@ -221,6 +221,26 @@ export const openapi = {
         responses: ok("Created", ref("Module"), "201"),
       }),
     },
+    "/projects/{id}/search": {
+      get: op("Search objects of the project by ID and text (deleted objects are not returned)", "Projects", {
+        params: [
+          idParam,
+          { name: "q", in: "query", required: true, schema: { type: "string" }, description: "e.g. REQ-0003 or a word" },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20, maximum: 100 } },
+        ],
+        responses: ok("Matches", arr({
+          type: "object",
+          properties: {
+            id: { type: "integer" },
+            display_id: { type: "string" },
+            heading: { type: "string" },
+            text: { type: "string" },
+            module_id: { type: "integer" },
+            module_name: { type: "string" },
+          },
+        })),
+      }),
+    },
     "/projects/{id}/id-blacklist": {
       get: op("IDs of deleted objects that are never issued again", "Projects", {
         params: [idParam],

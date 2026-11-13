@@ -117,3 +117,10 @@ tr[draggable="true"] { cursor: grab; }
 tr.drop-before td { box-shadow: inset 0 3px 0 var(--purple); }
 tr.drop-after td { box-shadow: inset 0 -3px 0 var(--purple); }
 tr.drop-child td { background: var(--purple-soft); }
+
+/* top-bar search results */
+.search { position: relative; }
+.results { position: absolute; left: 0; top: 120%; z-index: 20; width: min(34rem, 90vw); margin: 0; padding: .25rem; list-style: none; background: #fff; color: var(--text); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 16px rgba(0, 0, 0, .15); }
+.results button { display: block; width: 100%; text-align: left; border: 0; border-radius: 4px; color: var(--text); background: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results button:hover { background: var(--purple-soft); }
+.results .none { padding: .35rem .6rem; color: var(--muted); }

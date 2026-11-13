@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -125,6 +125,40 @@ describe("signed in", () => {
     expect(await screen.findByText("Battery")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Collapse REQ-0001/ }));
     expect(screen.queryByText("Battery")).not.toBeInTheDocument();
+  });
+
+  it("top-bar search lists matches of the current project and opens the object detail", async () => {
+    signedIn(me(), {
+      "GET /projects/1/search?q=REQ-0002&limit=10": json(200, [
+        { id: 2, display_id: "REQ-0002", heading: "Battery", text: "Lasts 8 h", module_id: 7, module_name: "System" },
+      ]),
+      "GET /objects/2": json(200, { id: 2, display_id: "REQ-0002", heading: "Battery", text: "Lasts 8 h", module_id: 7 }),
+      "GET /objects/2/links": json(200, []),
+    });
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    await userEvent.type(screen.getByRole("searchbox"), "REQ-0002");
+    const list = await screen.findByRole("list", { name: "Search results" });
+    await userEvent.click(within(list).getByRole("button", { name: /REQ-0002/ }));
+    expect(await screen.findByRole("heading", { name: /S4 · REQ-0002/ })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Search results" })).not.toBeInTheDocument();
+  });
+
+  it("top-bar search says so when nothing matches, and does not search without a project", async () => {
+    signedIn(me(), { "GET /projects/1/search?q=zzz&limit=10": json(200, []) });
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    await userEvent.type(screen.getByRole("searchbox"), "zzz");
+    expect(await screen.findByText("No matching requirements.")).toBeInTheDocument();
+  });
+
+  it("no search request is sent on the project list (no current project)", async () => {
+    signedIn(me());
+    mount("/projects");
+    await screen.findByRole("heading", { name: "Projects" });
+    await userEvent.type(screen.getByRole("searchbox"), "abc");
+    await new Promise((r) => setTimeout(r, 350));
+    expect(global.fetch.mock.calls.some(([u]) => String(u).includes("/search"))).toBe(false);
   });
 
   it("search in the top bar filters the tree", async () => {
