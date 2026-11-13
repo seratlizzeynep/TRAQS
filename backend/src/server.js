@@ -23,6 +23,16 @@ if (defaultsFile !== "") {
   }
 }
 
+// Allowed link types and their inverse labels (the link rules of a later step live in the same area).
+const linkTypesFile = process.env.TRAQS_LINK_TYPES ?? new URL("../config/link-types.json", import.meta.url);
+let linkTypes = [];
+try {
+  linkTypes = JSON.parse(readFileSync(linkTypesFile, "utf8"));
+} catch (e) {
+  console.error(`Cannot read link types from ${linkTypesFile}: ${e.message}`);
+  process.exit(1);
+}
+
 const db = openDb();
 if (await ensureAdmin(db, process.env.TRAQS_ADMIN_USER, process.env.TRAQS_ADMIN_PASSWORD)) {
   console.log(`Created administrator '${process.env.TRAQS_ADMIN_USER}'.`);
@@ -38,6 +48,7 @@ const port = Number(process.env.PORT ?? 8000);
 createApp(db, {
   jwtSecret,
   defaultAttributes,
+  linkTypes,
   sessionTimeoutMs: minutes(num("TRAQS_SESSION_TIMEOUT_MIN")),
   maxFailedLogins: num("TRAQS_MAX_FAILED_LOGINS"),
   lockMs: minutes(num("TRAQS_LOCK_MIN")),

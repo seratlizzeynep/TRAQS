@@ -100,13 +100,36 @@ export const openapi = {
         type: "object",
         properties: { parent_id: { type: "integer", nullable: true }, position: { type: "integer", minimum: 0 } },
       },
+      LinkEnd: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          display_id: { type: "string", example: "REQ-0001" },
+          heading: { type: "string" },
+          module_id: { type: "integer" },
+          module_name: { type: "string" },
+          deleted: { type: "boolean" },
+        },
+      },
+      LinkType: {
+        type: "object",
+        properties: {
+          name: { type: "string", example: "Derives" },
+          inverse: { type: "string", example: "Derived from", description: "How the target reads the link" },
+          description: { type: "string" },
+          informative: { type: "boolean", description: "Not counted in coverage" },
+        },
+      },
       Link: {
         type: "object",
         properties: {
           id: { type: "integer" },
           source_id: { type: "integer" },
           target_id: { type: "integer" },
+          type: { type: "string", example: "Derives" },
           suspect: { type: "integer", enum: [0, 1], description: "1 when an end of the link was deleted" },
+          source: ref("LinkEnd"),
+          target: ref("LinkEnd"),
         },
       },
       Role: { type: "string", enum: ["admin", "author", "reviewer", "viewer"] },
@@ -374,13 +397,23 @@ export const openapi = {
         responses: ok("Object", ref("Object")),
       }),
     },
+    "/link-types": {
+      get: op("Link types allowed by the configuration (config/link-types.json)", "Links", { responses: ok("Types", arr(ref("LinkType"))) }),
+    },
     "/objects/{id}/links": {
-      get: op("Links of an object", "Links", { params: [idParam], responses: ok("Links", arr(ref("Link"))) }),
-      post: op("Create a link to another object of the same project", "Links", {
+      get: op("Links of an object (both directions, also across modules)", "Links", { params: [idParam], responses: ok("Links", arr(ref("Link"))) }),
+      post: op("Create a typed link from this object to another object of the same project", "Links", {
         params: [idParam],
-        requestBody: body({ type: "object", required: ["target_id"], properties: { target_id: { type: "integer" } } }),
-        responses: ok("Created", ref("Link"), "201"),
+        requestBody: body({
+          type: "object",
+          required: ["target_id", "type"],
+          properties: { target_id: { type: "integer" }, type: { type: "string", description: "One of GET /link-types" } },
+        }),
+        responses: { ...ok("Created", ref("Link"), "201"), 409: { description: "This link already exists" } },
       }),
+    },
+    "/links/{id}": {
+      delete: op("Delete a link", "Links", { params: [idParam], responses: ok("Deleted", null, "204") }),
     },
   },
 };

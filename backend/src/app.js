@@ -4,6 +4,8 @@ import { createAuth } from "./auth.js";
 import { HttpError } from "./errors.js";
 import { createAttributeService } from "./attributes/service.js";
 import { mountAttributeRoutes } from "./attributes/routes.js";
+import { createLinkService } from "./links/service.js";
+import { mountLinkRoutes } from "./links/routes.js";
 import { openapi, docsHtml } from "./openapi.js";
 
 const isInt = (v) => Number.isInteger(v);
@@ -35,11 +37,12 @@ function parentId(body) {
 }
 
 // Internal columns (ID counter, soft-delete marker) are removed from every JSON response below.
-// options: { jwtSecret (required), now, sessionTimeoutMs, maxFailedLogins, lockMs, defaultAttributes }
+// options: { jwtSecret (required), now, sessionTimeoutMs, maxFailedLogins, lockMs, defaultAttributes, linkTypes }
 export function createApp(db, options = {}) {
   if (!options.jwtSecret) throw new Error("createApp requires a jwtSecret");
   const auth = createAuth(db, options);
   const attrs = createAttributeService(db, { defaults: options.defaultAttributes ?? [] });
+  const links = createLinkService(db, { types: options.linkTypes ?? [] });
   const { access, canSeeProject: visibleProject } = auth;
   const app = express();
   app.use(express.json());
@@ -305,29 +308,7 @@ export function createApp(db, options = {}) {
     res.json(rows);
   });
 
-  // ----------------------------------------------------------- links
-  api.post("/objects/:id/links", (req, res) => {
-    const src = find("objects", "Object", id(req));
-    access(req, projectOfObject(src), "write");
-    const target = req.body.target_id;
-    if (!isInt(target)) throw new HttpError(422, "target_id must be an integer");
-    if (target === src.id) throw new HttpError(422, "an object cannot link to itself");
-    const tgt = find("objects", "Object", target);
-    if (projectOfObject(tgt) !== projectOfObject(src)) throw new HttpError(422, "target must be in the same project");
-    try {
-      const r = db.prepare("INSERT INTO links (source_id, target_id) VALUES (?, ?)").run(src.id, target);
-      res.status(201).json(db.prepare("SELECT * FROM links WHERE id = ?").get(r.lastInsertRowid));
-    } catch (e) {
-      if (String(e.code).startsWith("SQLITE_CONSTRAINT")) throw new HttpError(409, "link already exists");
-      throw e;
-    }
-  });
-  api.get("/objects/:id/links", (req, res) => {
-    const o = find("objects", "Object", id(req));
-    access(req, projectOfObject(o), "read");
-    res.json(db.prepare("SELECT * FROM links WHERE source_id = ? OR target_id = ? ORDER BY id").all(o.id, o.id));
-  });
-
+  mountLinkRoutes(api, { links, db, find, id, access, projectOfObject });
   mountAttributeRoutes(api, { svc: attrs, db, find, id, access, projectOfObject, objOut });
 
   app.use("/api/v1", api);

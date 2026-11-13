@@ -35,13 +35,16 @@ export function openDb(path = process.env.TRAQS_DATABASE ?? "traqs.db") {
       deleted_at TEXT NOT NULL,
       PRIMARY KEY (project_id, display_id)
     );
+    -- Typed links between objects (the allowed types come from config/link-types.json).
     CREATE TABLE IF NOT EXISTS links (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       source_id INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE,
       target_id INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
       suspect INTEGER NOT NULL DEFAULT 0,
-      UNIQUE (source_id, target_id)
+      UNIQUE (source_id, target_id, type)
     );
+    CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_id);
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -96,6 +99,23 @@ function migrate(db) {
   if (!has("projects", "next_seq")) db.exec("ALTER TABLE projects ADD COLUMN next_seq INTEGER NOT NULL DEFAULT 1");
   if (!has("objects", "display_id")) db.exec("ALTER TABLE objects ADD COLUMN display_id TEXT");
   if (!has("objects", "deleted_at")) db.exec("ALTER TABLE objects ADD COLUMN deleted_at TEXT");
+  // Links created before link types existed become informative "Refers" links.
+  if (!has("links", "type")) {
+    db.exec(`
+      ALTER TABLE links RENAME TO links_old;
+      CREATE TABLE links (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_id INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE,
+        target_id INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        suspect INTEGER NOT NULL DEFAULT 0,
+        UNIQUE (source_id, target_id, type)
+      );
+      INSERT INTO links (id, source_id, target_id, type, suspect) SELECT id, source_id, target_id, 'Refers', suspect FROM links_old;
+      DROP TABLE links_old;
+      CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_id);
+    `);
+  }
   // Backfill IDs for objects that were created before display IDs existed.
   const missing = db
     .prepare(
