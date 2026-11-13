@@ -24,7 +24,7 @@ export function createLinkService(db, { config: rawConfig = {}, attrs } = {}) {
   return {
     config,
     // The types as the UI needs them, each with the text of its rule.
-    types: config.types.map((t) => ({ ...t, rule: config.rules[t.name] ? { description: config.rules[t.name].description, allow: config.rules[t.name].allow } : null })),
+    types: config.types.map((t) => ({ ...t, rule: config.rules[t.name] ? { description: config.rules[t.name].description, descriptions: config.rules[t.name].descriptions, allow: config.rules[t.name].allow } : null })),
 
     // The type must be one of the configured ones.
     checkType(name) {

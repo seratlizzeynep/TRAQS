@@ -211,3 +211,16 @@ test("invalid rule configuration stops the app at start-up", () => {
   assert.doesNotThrow(() => start({ ...base, rules: { A: { allow: [["X", "Y"]] } } }));
   assert.doesNotThrow(() => start(LINK_RULES));
 });
+
+test("rule texts can be given per language and are served with the types", async () => {
+  const c = await setup();
+  try {
+    const verifies = (await c.get("/link-types")).body.find((t) => t.name === "Verifies");
+    assert.match(verifies.rule.description, /test case/); // default text
+    assert.match(verifies.rule.descriptions.tr, /test senaryosu/); // Turkish text of the shipped file
+  } finally { c.close(); }
+  const start = (rules) => createApp(openDb(":memory:"), { jwtSecret: "s", linkRules: { kind_attribute: "level", types: [{ name: "A" }], rules } });
+  assert.throws(() => start({ A: { allow: "any", descriptions: "tr" } }), /descriptions/);
+  assert.throws(() => start({ A: { allow: "any", descriptions: { tr: 5 } } }), /descriptions/);
+  assert.doesNotThrow(() => start({ A: { allow: "any", descriptions: { tr: "metin" } } }));
+});

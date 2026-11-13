@@ -21,7 +21,7 @@ const mount = (path = "/projects/1/objects/2") =>
 const LINK_TYPES = [
   { name: "Derives", inverse: "Derived from", description: "", informative: false, rule: { description: "UR derives SR and SR derives SW.", allow: [["UR", "SR"], ["SR", "SW"]] } },
   { name: "Satisfies", inverse: "Satisfied by", description: "", informative: false, rule: { description: "SW satisfies SR.", allow: [["SW", "SR"]] } },
-  { name: "Verifies", inverse: "Verified by", description: "", informative: false, rule: { description: "Only a test case (TC) can verify a requirement.", allow: [["TC", "requirement"]] } },
+  { name: "Verifies", inverse: "Verified by", description: "", informative: false, rule: { description: "Only a test case (TC) can verify a requirement.", descriptions: { tr: "Bir gereksinimi yalnızca test senaryosu (TC) doğrulayabilir." }, allow: [["TC", "requirement"]] } },
   { name: "Refers", inverse: "Referred by", description: "", informative: true, rule: { description: "Informative: any object may refer to any object.", allow: "any" } },
 ];
 const end = (id, heading, over = {}) => ({ id, display_id: `REQ-000${id}`, heading, module_id: 7, module_name: "System", deleted: false, ...over });
@@ -177,6 +177,18 @@ describe("Links card (S4)", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Link rule 'Verifies'");
     expect(alert).toHaveTextContent("Allowed: TC to requirement");
+  });
+
+  it("shows the rule text in the user's language when the configuration has one", async () => {
+    localStorage.setItem("traqs.lang", "tr");
+    backend(author, []);
+    mount();
+    const form = within(await screen.findByRole("form", { name: "Bağlantı ekle" }));
+    // the first type (Derives) has no Turkish text: the default text is shown
+    expect(form.getByText(/UR derives SR and SR derives SW/)).toBeInTheDocument();
+    await userEvent.selectOptions(form.getByLabelText("Bağlantı türü"), "Verifies");
+    expect(form.getByText(/Kural: Bir gereksinimi yalnızca test senaryosu \(TC\) doğrulayabilir/)).toBeInTheDocument();
+    expect(form.queryByText(/Only a test case/)).not.toBeInTheDocument();
   });
 
   it("deletes a link after confirmation", async () => {

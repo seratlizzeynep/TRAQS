@@ -121,7 +121,11 @@ export const openapi = {
           rule: {
             type: "object",
             nullable: true,
-            properties: { description: { type: "string" }, allow: { description: '"any" or a list of [from, to] kind pairs' } },
+            properties: {
+              description: { type: "string", description: "Default (English) text of the rule" },
+              descriptions: { type: "object", description: "The same text per language, e.g. { \"tr\": \"...\" }" },
+              allow: { description: '"any" or a list of [from, to] kind pairs' },
+            },
           },
         },
       },

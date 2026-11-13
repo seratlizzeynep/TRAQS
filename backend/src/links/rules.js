@@ -6,7 +6,8 @@
 //   groups           names for sets of kinds, usable in rules ("requirement": ["UR", "SR", "SW"])
 //   unknown_kind     what to do when a rule needs the kind of an object that has none: "refuse" | "allow"
 //   types            the link types: { name, inverse, description, informative }
-//   rules            per link type: { description, allow, allow_skip_levels, acyclic }
+//   rules            per link type: { description, descriptions, allow, allow_skip_levels, acyclic }
+//                    descriptions: optional texts per language ({ "tr": "..." }); description is the default (English)
 //                    allow is "any" or a list of [from, to] pairs; each side is a kind, a group or "*"
 
 const KEY_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -59,7 +60,11 @@ export function normalizeLinkConfig(raw = {}) {
       if (!kindAttribute) throw new Error(`rule '${type}' needs a kind_attribute`);
     }
     if (r.allow_skip_levels && levels.length === 0) throw new Error(`rule '${type}': allow_skip_levels needs levels`);
-    rules[type] = { description: r.description ?? "", allow, allow_skip_levels: r.allow_skip_levels === true, acyclic: r.acyclic === true };
+    const descriptions = r.descriptions ?? {};
+    if (typeof descriptions !== "object" || Array.isArray(descriptions) || descriptions === null || !Object.values(descriptions).every((d) => typeof d === "string")) {
+      throw new Error(`rule '${type}': descriptions must map a language to a text`);
+    }
+    rules[type] = { description: r.description ?? "", descriptions, allow, allow_skip_levels: r.allow_skip_levels === true, acyclic: r.acyclic === true };
   }
   return { kind_attribute: kindAttribute, levels, groups, unknown_kind: unknownKind, types, rules };
 }

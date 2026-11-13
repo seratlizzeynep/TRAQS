@@ -31,20 +31,24 @@
   "rules": {
     "Derives": {
       "description": "UR derives SR and SR derives SW. Skipping a level (UR to SW) is allowed but reported as a gap. Derives links must not form a cycle.",
+      "descriptions": { "tr": "UR, SR'yi; SR, SW'yi türetir. Bir seviyeyi atlamak (UR'den SW'ye) izinlidir ama boşluk olarak raporlanır. Türetme bağlantıları döngü oluşturamaz." },
       "allow": [["UR", "SR"], ["SR", "SW"]],
       "allow_skip_levels": true,
       "acyclic": true
     },
     "Satisfies": {
       "description": "SW satisfies SR, SR satisfies UR, and a design item (DI) satisfies any requirement.",
+      "descriptions": { "tr": "SW, SR'yi; SR, UR'yi karşılar. Tasarım öğesi (DI) herhangi bir gereksinimi karşılayabilir." },
       "allow": [["SW", "SR"], ["SR", "UR"], ["DI", "requirement"]]
     },
     "Verifies": {
       "description": "Only a test case (TC) can verify a requirement.",
+      "descriptions": { "tr": "Bir gereksinimi yalnızca test senaryosu (TC) doğrulayabilir." },
       "allow": [["TC", "requirement"]]
     },
     "Refers": {
       "description": "Informative: any object may refer to any object.",
+      "descriptions": { "tr": "Bilgilendirici: her nesne her nesneye atıf yapabilir." },
       "allow": "any"
     }
   }
