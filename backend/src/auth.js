@@ -158,11 +158,34 @@ export function createAuth(db, { jwtSecret, now = () => Date.now(), ...opts }) {
       res.json(publicUser(find("users", "User", u.id)));
     });
 
+    // Administrator sets a new password: clears a lock and ends all sessions of that user.
+    api.put("/users/:id/password", wrap(async (req, res) => {
+      access(req, null, "manage");
+      const u = find("users", "User", id(req));
+      const password = req.body?.password;
+      if (typeof password !== "string" || password.length < 8) {
+        throw new HttpError(422, "password must have at least 8 characters");
+      }
+      const hash = await hashPassword(password);
+      db.transaction(() => {
+        db.prepare("UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?").run(hash, u.id);
+        db.prepare("UPDATE sessions SET revoked = 1 WHERE user_id = ?").run(u.id);
+      })();
+      res.status(204).end();
+    }));
+
     // Role of a user in a project (project administrators manage their own project).
     api.get("/projects/:id/members", (req, res) => {
       const p = find("projects", "Project", id(req));
       access(req, p.id, "manage");
-      res.json(db.prepare("SELECT user_id, role FROM memberships WHERE project_id = ? ORDER BY user_id").all(p.id));
+      res.json(
+        db
+          .prepare(
+            `SELECT m.user_id, u.username, m.role FROM memberships m JOIN users u ON u.id = m.user_id
+             WHERE m.project_id = ? ORDER BY u.username`
+          )
+          .all(p.id)
+      );
     });
     api.put("/projects/:id/members/:userId", (req, res) => {
       const p = find("projects", "Project", id(req));
