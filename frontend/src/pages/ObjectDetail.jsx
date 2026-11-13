@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ApiError, get } from "../api.js";
+import { get } from "../api.js";
 import { ValueDisplay } from "../attributes/inputs.jsx";
 import { useAttributes } from "../attributes/useAttributes.js";
+import { useAuth } from "../auth.jsx";
 import { useI18n } from "../i18n.jsx";
+import LinksCard from "../links/LinksCard.jsx";
+import { can, roleIn } from "../permissions.js";
 
 // S4 (object detail) with S5 (AI assistant panel). The AI actions are not available yet.
 export default function ObjectDetail() {
   const { t } = useI18n();
   const { projectId, objectId } = useParams();
+  const { user } = useAuth();
   const { types, definitions } = useAttributes(projectId);
   const [state, setState] = useState({ loading: true });
 
@@ -17,18 +21,7 @@ export default function ObjectDetail() {
     (async () => {
       try {
         const obj = await get(`/objects/${objectId}`);
-        const links = await get(`/objects/${objectId}/links`);
-        const resolved = await Promise.all(
-          links.map(async (l) => {
-            const otherId = l.source_id === obj.id ? l.target_id : l.source_id;
-            const other = await get(`/objects/${otherId}`).catch((e) => {
-              if (e instanceof ApiError && e.status === 404) return null; // deleted
-              throw e;
-            });
-            return { ...l, outgoing: l.source_id === obj.id, otherId, other };
-          })
-        );
-        if (!cancelled) setState({ obj, links: resolved });
+        if (!cancelled) setState({ obj });
       } catch (e) {
         if (!cancelled) setState({ error: e });
       }
@@ -38,7 +31,7 @@ export default function ObjectDetail() {
 
   if (state.loading) return <p>{t("common.loading")}</p>;
   if (state.error) return <p role="alert" className="error">{t(state.error.status === 404 ? "detail.notFound" : "common.error")}</p>;
-  const { obj, links } = state;
+  const { obj } = state;
   const off = { disabled: true, title: t("common.unavailable") };
 
   return (
@@ -57,16 +50,7 @@ export default function ObjectDetail() {
               <div key={d.id}>{d.name}: <ValueDisplay def={d} types={types} value={obj.attributes?.[d.key]} /></div>
             ))}
           </div>
-          <div className="card">
-            <div className="label">{t("detail.links")}</div>
-            {links.length === 0 ? <span className="muted">{t("detail.noLinks")}</span> : links.map((l) => (
-              <div key={l.id}>
-                {l.outgoing ? "→" : "←"}{" "}
-                {l.other ? <Link to={`../objects/${l.otherId}`}>{l.other.display_id}</Link> : <span className="muted">{t("detail.deleted")}</span>}
-                {l.suspect ? <> <span className="badge red">{t("detail.suspect")}</span></> : null}
-              </div>
-            ))}
-          </div>
+          <LinksCard key={obj.id} obj={obj} projectId={projectId} writable={can(roleIn(user, projectId), "write")} />
           <div className="card"><div className="label">{t("detail.comments")}</div><span className="muted">{t("detail.noComments")}</span></div>
           <div className="toolbar">
             <button type="button" {...off}>{t("detail.classify")}</button>

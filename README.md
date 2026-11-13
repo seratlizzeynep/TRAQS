@@ -8,7 +8,7 @@ The reports are in [`docs/`](docs/) and the project web page is [`index.html`](i
 
 - Projects, modules and hierarchical, ordered objects (parent/child with an explicit position)
 - Sequential object IDs (`REQ-0001`), soft delete with an ID blacklist (an ID is never reused)
-- Links between objects; links to deleted objects become *suspect*
+- Typed links between objects (Derives, Satisfies, Verifies, Refers), within and across modules; links to deleted objects become *suspect*
 - User-defined, typed attributes per project (text, enumeration, number, date) shown as columns in the module table
 - Versioned REST API under `/api/v1` with OpenAPI documentation
 - Login with salted password hashes, JWT sessions (30 min inactivity timeout), account lock after 5 failed logins
@@ -87,6 +87,7 @@ cd frontend && npm test
 | `TRAQS_JWT_SECRET` | random per start | Secret used to sign tokens. Set it, or tokens become invalid on restart |
 | `TRAQS_ADMIN_USER`, `TRAQS_ADMIN_PASSWORD` | none | Creates the first administrator when no users exist |
 | `TRAQS_DATABASE` | `traqs.db` | SQLite file |
+| `TRAQS_LINK_TYPES` | `backend/config/link-types.json` | The allowed link types, with their inverse labels |
 | `TRAQS_DEFAULT_ATTRIBUTES` | `backend/config/default-attributes.json` | Attributes every new project starts with. Empty value = none |
 | `PORT` | `8000` | API port |
 | `TRAQS_SESSION_TIMEOUT_MIN` | `30` | Inactivity timeout of a session |
@@ -103,7 +104,7 @@ Every call is checked against the user's role in the project.
 | Projects | `/projects`, `/projects/{id}`, `/projects/{id}/members/{userId}` |
 | Modules | `/projects/{id}/modules`, `/modules/{id}` |
 | Objects | `/modules/{id}/objects` (tree or `?flat=true`), `/objects/{id}`, `POST /objects/{id}/move` |
-| Links | `/objects/{id}/links` |
+| Links | `/link-types`, `/objects/{id}/links` (create with `type`), `DELETE /links/{id}` |
 | Attributes | `/attribute-types`, `/projects/{id}/attributes`, `/attributes/{id}`, `PUT /objects/{id}/attributes` |
 | Users | `/users`, `/users/{id}/unlock` |
 
@@ -123,6 +124,13 @@ every project can change, delete or add attributes on the **Attributes** screen.
   type from the field list the server sends (`GET /attribute-types`).
 - Values are validated against their type; a wrong value is rejected with `422`, and options cannot be
   changed in a way that would invalidate stored values.
+
+## Link types (configuration)
+
+The allowed link types are listed in [`backend/config/link-types.json`](backend/config/link-types.json)
+(name, inverse label shown at the target, description, `informative` flag). Edit the file to change them;
+no code is involved. A link goes from a source to a target in the same project, in any module, never to
+the object itself; the same pair may be linked with several types, but not twice with the same type.
 
 ## Roles
 

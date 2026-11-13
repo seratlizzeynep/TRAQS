@@ -95,6 +95,7 @@ describe("signed in", () => {
       "GET /projects": json(200, projects),
       "GET /projects/1": json(200, projects[0]),
       "GET /attribute-types": json(200, TYPES),
+      "GET /link-types": json(200, []),
       "GET /projects/1/attributes": json(200, DEFS),
       "GET /projects/1/modules": json(200, [{ id: 7, project_id: 1, name: "System" }]),
       "GET /modules/7/objects": json(200, [
@@ -244,8 +245,11 @@ describe("signed in", () => {
   it("object detail shows text, links with a suspect tag and the AI panel", async () => {
     signedIn(me(), {
       "GET /objects/2": json(200, { id: 2, display_id: "REQ-0002", heading: "Battery", text: "Lasts 8 h", module_id: 7, children: [] }),
-      "GET /objects/2/links": json(200, [{ id: 1, source_id: 2, target_id: 9, suspect: 1 }]),
-      "GET /objects/9": json(404, { detail: "gone" }),
+      "GET /objects/2/links": json(200, [{
+        id: 1, source_id: 2, target_id: 9, type: "Derives", suspect: 1,
+        source: { id: 2, display_id: "REQ-0002", heading: "Battery", module_id: 7, module_name: "System", deleted: false },
+        target: { id: 9, display_id: "REQ-0009", heading: "Gone", module_id: 7, module_name: "System", deleted: true },
+      }]),
     });
     mount("/projects/1/objects/2");
     expect(await screen.findByRole("heading", { name: /REQ-0002/ })).toBeInTheDocument();
