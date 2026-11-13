@@ -6,8 +6,9 @@ import { createUser } from "../src/auth.js";
 
 export const API = "/api/v1";
 export const SECRET = "test-secret";
-// the link types of the shipped configuration
-export const LINK_TYPES = JSON.parse(readFileSync(new URL("../config/link-types.json", import.meta.url), "utf8"));
+// the shipped link configuration (types and rules)
+export const LINK_RULES = JSON.parse(readFileSync(new URL("../config/link-rules.json", import.meta.url), "utf8"));
+export const DEFAULT_ATTRIBUTES = JSON.parse(readFileSync(new URL("../config/default-attributes.json", import.meta.url), "utf8"));
 
 // Creates a user with the given grants ({"*": "admin"} or {projectId: role}) and a live session;
 // returns a JWT for it, as /auth/login would.
@@ -69,7 +70,7 @@ function client(base, tok, server, db) {
 // Starts a fresh app on an in-memory database; the returned client is an all-projects admin.
 export async function setup(options = {}) {
   const db = openDb(":memory:");
-  const server = createApp(db, { jwtSecret: SECRET, linkTypes: LINK_TYPES, ...options }).listen(0);
+  const server = createApp(db, { jwtSecret: SECRET, linkRules: LINK_RULES, ...options }).listen(0);
   await new Promise((r) => server.once("listening", r));
   const base = `http://127.0.0.1:${server.address().port}${API}`;
   return client(base, await tokenFor(db, { "*": "admin" }), server, db);

@@ -4,12 +4,14 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
-import { LINK_TYPES, setup } from "./helpers.js";
+import { LINK_RULES, setup } from "./helpers.js";
+import { normalizeLinkConfig } from "../src/links/rules.js";
 import { createApp } from "../src/app.js";
 import { openDb } from "../src/db.js";
 
+const OPEN = { ...LINK_RULES, rules: {} }; // the shipped types, no rules: these tests are about links as such (rules: link-rules.test.js)
 const withApp = (fn, options) => async () => {
-  const c = await setup(options);
+  const c = await setup({ linkRules: OPEN, ...options });
   try { await fn(c, await c.module()); } finally { c.close(); }
 };
 const link = (c, from, to, type) => c.post(`/objects/${from.id}/links`, { target_id: to.id, type });
@@ -147,7 +149,7 @@ test("permissions: read to see, write to create and delete, no access across pro
 
 test("the link types are configuration, not code", async () => {
   const custom = [{ name: "Implements", inverse: "Implemented by" }, { name: "Conflicts" }];
-  const c = await setup({ linkTypes: custom });
+  const c = await setup({ linkRules: { types: custom } });
   try {
     const m = await c.module();
     const a = await c.add(m, "A");
@@ -159,16 +161,17 @@ test("the link types are configuration, not code", async () => {
 });
 
 test("invalid link type configuration stops the app at start-up", () => {
-  const start = (linkTypes) => createApp(openDb(":memory:"), { jwtSecret: "s", linkTypes });
+  const start = (types) => createApp(openDb(":memory:"), { jwtSecret: "s", linkRules: { types } });
   assert.throws(() => start("nope"), /list/);
   assert.throws(() => start([{}]), /name/);
   assert.throws(() => start([{ name: "A" }, { name: "a" }]), /twice/);
   assert.throws(() => start([{ name: "A", inverse: 5 }]), /inverse/);
   assert.doesNotThrow(() => start([]));
+  assert.throws(() => normalizeLinkConfig("nope"), /object/);
 });
 
 test("the shipped configuration lists the four types of the requirement", () => {
-  assert.deepEqual(LINK_TYPES.map((t) => t.name), ["Derives", "Satisfies", "Verifies", "Refers"]);
+  assert.deepEqual(LINK_RULES.types.map((t) => t.name), ["Derives", "Satisfies", "Verifies", "Refers"]);
 });
 
 test("links of an older database become 'Refers' links", () => {

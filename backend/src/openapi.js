@@ -118,7 +118,17 @@ export const openapi = {
           inverse: { type: "string", example: "Derived from", description: "How the target reads the link" },
           description: { type: "string" },
           informative: { type: "boolean", description: "Not counted in coverage" },
+          rule: {
+            type: "object",
+            nullable: true,
+            properties: { description: { type: "string" }, allow: { description: '"any" or a list of [from, to] kind pairs' } },
+          },
         },
+      },
+      LinkRuleStatus: {
+        type: "object",
+        description: "How the link stands against the link rules: ok, gap (skips a level, allowed) or violation (breaks a rule, e.g. after a Level changed)",
+        properties: { status: { type: "string", enum: ["ok", "gap", "violation"] }, message: { type: "string" } },
       },
       Link: {
         type: "object",
@@ -130,6 +140,7 @@ export const openapi = {
           suspect: { type: "integer", enum: [0, 1], description: "1 when an end of the link was deleted" },
           source: ref("LinkEnd"),
           target: ref("LinkEnd"),
+          rule: ref("LinkRuleStatus"),
         },
       },
       Role: { type: "string", enum: ["admin", "author", "reviewer", "viewer"] },
@@ -398,7 +409,13 @@ export const openapi = {
       }),
     },
     "/link-types": {
-      get: op("Link types allowed by the configuration (config/link-types.json)", "Links", { responses: ok("Types", arr(ref("LinkType"))) }),
+      get: op("Link types and the rule of each (config/link-rules.json)", "Links", { responses: ok("Types", arr(ref("LinkType"))) }),
+    },
+    "/projects/{id}/link-issues": {
+      get: op("Links of the project that skip a level (gap) or no longer satisfy the link rules", "Links", {
+        params: [idParam],
+        responses: ok("Links with rule.status gap or violation", arr(ref("Link"))),
+      }),
     },
     "/objects/{id}/links": {
       get: op("Links of an object (both directions, also across modules)", "Links", { params: [idParam], responses: ok("Links", arr(ref("Link"))) }),
@@ -409,7 +426,7 @@ export const openapi = {
           required: ["target_id", "type"],
           properties: { target_id: { type: "integer" }, type: { type: "string", description: "One of GET /link-types" } },
         }),
-        responses: { ...ok("Created", ref("Link"), "201"), 409: { description: "This link already exists" } },
+        responses: { ...ok("Created", ref("Link"), "201"), 409: { description: "This link already exists" }, 422: { description: "Breaks a link rule (the message names the rule), would create a cycle, or is otherwise invalid" } },
       }),
     },
     "/links/{id}": {

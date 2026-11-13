@@ -7,9 +7,9 @@
   },
   {
     "name": "Level",
-    "description": "Requirement level.",
+    "description": "Kind of object: user requirement (UR), system requirement (SR), software requirement (SW), design item (DI) or test case (TC). The link rules use it.",
     "type": "enumeration",
-    "options": { "values": ["UR", "SR", "SW"] }
+    "options": { "values": ["UR", "SR", "SW", "DI", "TC"] }
   },
   {
     "name": "Verification",
