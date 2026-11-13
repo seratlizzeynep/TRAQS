@@ -111,3 +111,9 @@ table.grid { width: 100%; border-collapse: collapse; border: 1px solid var(--bor
   .leftnav ul { display: flex; }
   .leftnav a { white-space: nowrap; }
 }
+
+/* drag and drop in the object tree */
+tr[draggable="true"] { cursor: grab; }
+tr.drop-before td { box-shadow: inset 0 3px 0 var(--purple); }
+tr.drop-after td { box-shadow: inset 0 -3px 0 var(--purple); }
+tr.drop-child td { background: var(--purple-soft); }

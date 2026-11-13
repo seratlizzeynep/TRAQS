@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -170,6 +170,32 @@ describe("signed in", () => {
     mount("/projects/1/analysis");
     expect(await screen.findByRole("heading", { name: /Analysis dashboard/ })).toBeInTheDocument();
     expect(screen.getByText("92 %")).toBeInTheDocument();
+  });
+
+  it("authors can drag a row onto another one and the move is sent to the API", async () => {
+    const moves = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "GET /modules/7/objects": json(200, [
+        { id: 1, display_id: "REQ-0001", heading: "Power", text: "", parent_id: null, children: [] },
+        { id: 2, display_id: "REQ-0002", heading: "Display", text: "", parent_id: null, children: [] },
+      ]),
+      "POST /objects/2/move": (opts) => { moves.push(JSON.parse(opts.body)); return json(200, {}); },
+    });
+    mount("/projects/1/modules");
+    const rowOf = (name) => screen.getByText(name).closest("tr");
+    await screen.findByText("Display");
+    const dt = { setData() {}, effectAllowed: "" };
+    fireEvent.dragStart(rowOf("Display"), { dataTransfer: dt });
+    fireEvent.dragOver(rowOf("Power"), { dataTransfer: dt });
+    fireEvent.drop(rowOf("Power"), { dataTransfer: dt });
+    await waitFor(() => expect(moves).toEqual([{ parent_id: 1, position: null }]));
+  });
+
+  it("viewers cannot drag rows", async () => {
+    signedIn(me());
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    expect(screen.getByText("Battery").closest("tr")).not.toHaveAttribute("draggable", "true");
   });
 
   it("a user without access to the project gets a not-found message", async () => {

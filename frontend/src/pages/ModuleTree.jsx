@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { get, post } from "../api.js";
+import { dropTarget } from "../dnd.js";
 import { useAuth } from "../auth.jsx";
 import { useI18n } from "../i18n.jsx";
 import { can, roleIn } from "../permissions.js";
@@ -35,11 +36,20 @@ export function visibleRows(nodes, collapsed, depth = 0, out = []) {
   return out;
 }
 
+// Where on a row the pointer is: top quarter = before, bottom quarter = after, middle = as child.
+export function zoneOf(clientY, rect) {
+  if (!rect || !rect.height) return "child";
+  const r = (clientY - rect.top) / rect.height;
+  return r < 0.25 ? "before" : r > 0.75 ? "after" : "child";
+}
+
 function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState(new Set());
   const [adding, setAdding] = useState(false);
   const [heading, setHeading] = useState("");
+  const [dragId, setDragId] = useState(null);
+  const [hover, setHover] = useState(null); // { id, zone }
   const numbers = useMemo(() => outlineNumbers(tree), [tree]);
   const rows = visibleRows(filterTree(tree, q), collapsed);
 
@@ -53,6 +63,17 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
     await post(`/modules/${module.id}/objects`, { heading }).catch(onError);
     setHeading("");
     setAdding(false);
+    onChanged();
+  };
+  const endDrag = () => { setDragId(null); setHover(null); };
+  const onDrop = async (e, targetId) => {
+    e.preventDefault();
+    const zone = zoneOf(e.clientY, e.currentTarget.getBoundingClientRect());
+    const move = dragId === null ? null : dropTarget(tree, dragId, targetId, zone);
+    const id = dragId;
+    endDrag();
+    if (!move) return;
+    await post(`/objects/${id}/move`, move).catch(onError);
     onChanged();
   };
   const unavailable = { "aria-disabled": true, title: t("common.unavailable"), onClick: (e) => e.preventDefault() };
@@ -95,7 +116,20 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
               const has = node.children.length > 0;
               const open = !collapsed.has(node.id);
               return (
-                <tr key={node.id}>
+                <tr
+                  key={node.id}
+                  draggable={writable}
+                  className={hover?.id === node.id ? `drop-${hover.zone}` : undefined}
+                  onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(node.id)); setDragId(node.id); }}
+                  onDragOver={(e) => {
+                    if (dragId === null || dragId === node.id) return;
+                    e.preventDefault();
+                    const zone = zoneOf(e.clientY, e.currentTarget.getBoundingClientRect());
+                    if (hover?.id !== node.id || hover.zone !== zone) setHover({ id: node.id, zone });
+                  }}
+                  onDragEnd={endDrag}
+                  onDrop={(e) => onDrop(e, node.id)}
+                >
                   <td className="tree" style={{ paddingLeft: `${0.6 + depth * 1.4}rem` }}>
                     {has ? (
                       <button type="button" className="twisty" aria-expanded={open}
