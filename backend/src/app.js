@@ -2,6 +2,8 @@ import express from "express";
 import { nextDisplayId } from "./db.js";
 import { createAuth } from "./auth.js";
 import { HttpError } from "./errors.js";
+import { createAttributeService } from "./attributes/service.js";
+import { mountAttributeRoutes } from "./attributes/routes.js";
 import { openapi, docsHtml } from "./openapi.js";
 
 const isInt = (v) => Number.isInteger(v);
@@ -33,10 +35,11 @@ function parentId(body) {
 }
 
 // Internal columns (ID counter, soft-delete marker) are removed from every JSON response below.
-// options: { jwtSecret (required), now, sessionTimeoutMs, maxFailedLogins, lockMs }
+// options: { jwtSecret (required), now, sessionTimeoutMs, maxFailedLogins, lockMs, defaultAttributes }
 export function createApp(db, options = {}) {
   if (!options.jwtSecret) throw new Error("createApp requires a jwtSecret");
   const auth = createAuth(db, options);
+  const attrs = createAttributeService(db, { defaults: options.defaultAttributes ?? [] });
   const { access, canSeeProject: visibleProject } = auth;
   const app = express();
   app.use(express.json());
@@ -68,6 +71,8 @@ export function createApp(db, options = {}) {
 
   const projectOfModule = (m) => m.project_id;
   const projectOfObject = (o) => db.prepare("SELECT project_id FROM modules WHERE id = ?").get(o.module_id).project_id;
+  // An object as returned by the API: its columns plus its attribute values.
+  const objOut = (o) => ({ ...o, attributes: attrs.valuesForObject(o.id) });
 
   // ------------------------------------------------ projects & modules
   // Both share the {name, description} shape.
@@ -76,6 +81,7 @@ export function createApp(db, options = {}) {
     const name = str(req.body, "name", { required: true, max: 200 });
     const description = str(req.body, "description") ?? "";
     const r = db.prepare("INSERT INTO projects (name, description) VALUES (?, ?)").run(name, description);
+    attrs.applyDefaults(r.lastInsertRowid); // configured default attributes (config/default-attributes.json)
     res.status(201).json(find("projects", "Project", r.lastInsertRowid));
   });
   api.get("/projects", (req, res) =>
@@ -171,6 +177,7 @@ export function createApp(db, options = {}) {
     const text = str(req.body, "text") ?? "";
     const parent = parentId(req.body);
     const requested = pos(req.body);
+    const entries = req.body.attributes === undefined ? [] : attrs.parseValues(m.project_id, req.body.attributes);
     const created = db.transaction(() => {
       checkParent(m.id, parent);
       const n = countSiblings(m.id, parent);
@@ -181,9 +188,10 @@ export function createApp(db, options = {}) {
           "INSERT INTO objects (module_id, parent_id, position, heading, text, display_id) VALUES (?, ?, ?, ?, ?, ?)"
         )
         .run(m.id, parent, position, heading, text, nextDisplayId(db, m.project_id));
+      attrs.writeValues(r.lastInsertRowid, entries);
       return r.lastInsertRowid;
     })();
-    res.status(201).json(find("objects", "Object", created));
+    res.status(201).json(objOut(find("objects", "Object", created)));
   });
 
   // Nested, ordered tree; `?flat=true` returns a flat list.
@@ -191,7 +199,8 @@ export function createApp(db, options = {}) {
     const m = find("modules", "Module", id(req));
     access(req, projectOfModule(m), "read");
     const rows = db.prepare("SELECT * FROM objects WHERE module_id = ? AND deleted_at IS NULL ORDER BY position, id").all(m.id);
-    const nodes = new Map(rows.map((r) => [r.id, { ...r, children: [] }]));
+    const values = attrs.valuesForModule(m.id);
+    const nodes = new Map(rows.map((r) => [r.id, { ...r, attributes: values.get(r.id) ?? {}, children: [] }]));
     if (req.query.flat === "true") return res.json([...nodes.values()]);
     const roots = [];
     for (const r of rows) (r.parent_id === null ? roots : nodes.get(r.parent_id).children).push(nodes.get(r.id));
@@ -201,7 +210,7 @@ export function createApp(db, options = {}) {
   api.get("/objects/:id", (req, res) => {
     const o = find("objects", "Object", id(req));
     access(req, projectOfObject(o), "read");
-    res.json(o);
+    res.json(objOut(o));
   });
 
   api.patch("/objects/:id", (req, res) => {
@@ -210,7 +219,7 @@ export function createApp(db, options = {}) {
     const heading = str(req.body, "heading", { max: 300 }) ?? o.heading;
     const text = str(req.body, "text") ?? o.text;
     db.prepare("UPDATE objects SET heading = ?, text = ? WHERE id = ?").run(heading, text, o.id);
-    res.json(find("objects", "Object", o.id));
+    res.json(objOut(find("objects", "Object", o.id)));
   });
 
   // Re-parent and/or reorder within the module. Omitted position = append.
@@ -232,7 +241,7 @@ export function createApp(db, options = {}) {
       makeRoom(o.module_id, parent, position);
       db.prepare("UPDATE objects SET parent_id = ?, position = ? WHERE id = ?").run(parent, position, o.id);
     })();
-    res.json(find("objects", "Object", o.id));
+    res.json(objOut(find("objects", "Object", o.id)));
   });
 
   // Soft-deletes the object and its subtree. Their IDs go on the blacklist, links that point to
@@ -318,6 +327,8 @@ export function createApp(db, options = {}) {
     access(req, projectOfObject(o), "read");
     res.json(db.prepare("SELECT * FROM links WHERE source_id = ? OR target_id = ? ORDER BY id").all(o.id, o.id));
   });
+
+  mountAttributeRoutes(api, { svc: attrs, db, find, id, access, projectOfObject, objOut });
 
   app.use("/api/v1", api);
 

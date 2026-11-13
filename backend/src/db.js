@@ -62,6 +62,26 @@ export function openDb(path = process.env.TRAQS_DATABASE ?? "traqs.db") {
       last_activity INTEGER NOT NULL,
       revoked INTEGER NOT NULL DEFAULT 0
     );
+    -- User-defined, typed attributes: definitions per project, values per object.
+    CREATE TABLE IF NOT EXISTS attribute_definitions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      key TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      type TEXT NOT NULL,
+      options TEXT NOT NULL DEFAULT '{}',
+      position INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (project_id, key)
+    );
+    CREATE TABLE IF NOT EXISTS attribute_values (
+      object_id INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE,
+      definition_id INTEGER NOT NULL REFERENCES attribute_definitions(id) ON DELETE CASCADE,
+      value_text TEXT,
+      value_number REAL,
+      PRIMARY KEY (object_id, definition_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_attr_values_def ON attribute_values(definition_id);
     CREATE INDEX IF NOT EXISTS idx_modules_project ON modules(project_id);
     CREATE INDEX IF NOT EXISTS idx_objects_module ON objects(module_id);
     CREATE INDEX IF NOT EXISTS idx_objects_parent ON objects(parent_id);
