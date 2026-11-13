@@ -138,4 +138,6 @@ export default {
   "modules.confirmDelete": "Bu nesne ve altındaki her şey silinsin mi? Kimliği bir daha kullanılmayacak.",
   "common.save": "Kaydet",
   "common.cancel": "İptal",
+  "project.notFound": "Bu proje yok ya da erişiminiz yok.",
+  "project.back": "Projelere dön",
 };

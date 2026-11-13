@@ -249,7 +249,7 @@ export default function ModuleTree() {
         </form>
       )}
       {modules === null ? (
-        <p>{t("common.loading")}</p>
+        error ? null : <p>{t("common.loading")}</p>
       ) : modules.length === 0 ? (
         <p>{t("modules.empty")}</p>
       ) : (

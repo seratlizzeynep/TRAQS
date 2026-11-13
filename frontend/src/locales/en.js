@@ -138,4 +138,6 @@ export default {
   "modules.confirmDelete": "Delete this object and everything below it? Its ID will never be used again.",
   "common.save": "Save",
   "common.cancel": "Cancel",
+  "project.notFound": "This project does not exist, or you have no access to it.",
+  "project.back": "Back to projects",
 };

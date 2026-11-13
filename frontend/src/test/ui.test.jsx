@@ -83,6 +83,7 @@ describe("signed in", () => {
     fakeApi({
       "GET /auth/me": json(200, user),
       "GET /projects": json(200, projects),
+      "GET /projects/1": json(200, projects[0]),
       "GET /projects/1/modules": json(200, [{ id: 7, project_id: 1, name: "System" }]),
       "GET /modules/7/objects": json(200, [
         { id: 1, display_id: "REQ-0001", heading: "Power", text: "", children: [
@@ -310,10 +311,20 @@ describe("signed in", () => {
     expect(screen.getByText("Battery").closest("tr")).not.toHaveAttribute("draggable", "true");
   });
 
+  it("an address of a project that does not exist shows a clear message and a way back", async () => {
+    signedIn(me({ is_admin: true, memberships: [] }), {
+      "GET /projects/9": json(404, { detail: "Project 9 not found" }),
+    });
+    mount("/projects/9/modules");
+    expect(await screen.findByRole("alert")).toHaveTextContent("This project does not exist, or you have no access to it.");
+    expect(screen.getByRole("link", { name: "Back to projects" })).toHaveAttribute("href", "/projects");
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+  });
+
   it("a user without access to the project gets a not-found message", async () => {
     signedIn(me({ memberships: [] }));
     mount("/projects/1/modules");
-    expect(await screen.findByRole("alert")).toHaveTextContent("Page not found.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("does not exist, or you have no access");
   });
 
   it("log out returns to the login screen", async () => {

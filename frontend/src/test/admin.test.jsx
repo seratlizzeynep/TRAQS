@@ -34,6 +34,7 @@ function backend(me, extra = {}) {
   const routes = {
     "GET /auth/me": json(200, me),
     "GET /projects": json(200, [{ id: 1, name: "Alpha", description: "" }]),
+    "GET /projects/1": json(200, { id: 1, name: "Alpha", description: "" }),
     "GET /projects/1/members": json(200, members),
     "GET /users": json(200, users),
     ...extra,
