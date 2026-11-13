@@ -255,6 +255,47 @@ describe("signed in", () => {
     expect(confirm.mock.calls[1][0]).toMatch(/REQ-0002/);
   });
 
+  it("authors edit heading and text of an object in place", async () => {
+    const patches = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "PATCH /objects/2": (opts) => { patches.push(JSON.parse(opts.body)); return json(200, {}); },
+    });
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    await userEvent.click(screen.getByRole("button", { name: "Edit REQ-0002" }));
+    const heading = screen.getByLabelText("Heading");
+    expect(heading).toHaveValue("Battery");
+    await userEvent.clear(heading);
+    await userEvent.type(heading, "Battery life");
+    await userEvent.type(screen.getByLabelText("Text (optional)"), "At least 8 h.");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patches).toEqual([{ heading: "Battery life", text: "At least 8 h." }]));
+    expect(screen.queryByLabelText("Heading")).not.toBeInTheDocument(); // editing ended
+  });
+
+  it("cancel and Escape leave the object unchanged", async () => {
+    const patches = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "PATCH /objects/2": (opts) => { patches.push(opts.body); return json(200, {}); },
+    });
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    await userEvent.click(screen.getByRole("button", { name: "Edit REQ-0002" }));
+    await userEvent.type(screen.getByLabelText("Heading"), "x");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit REQ-0002" }));
+    await userEvent.type(screen.getByLabelText("Heading"), "y{Escape}");
+    expect(screen.queryByLabelText("Heading")).not.toBeInTheDocument();
+    expect(patches).toEqual([]);
+  });
+
+  it("viewers see no edit buttons", async () => {
+    signedIn(me());
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    expect(screen.queryByRole("button", { name: /^Edit REQ/ })).not.toBeInTheDocument();
+  });
+
   it("viewers see no delete buttons", async () => {
     signedIn(me());
     mount("/projects/1/modules");

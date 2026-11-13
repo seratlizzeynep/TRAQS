@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { del, get, post } from "../api.js";
+import { del, get, patch, post } from "../api.js";
 import { dropTarget } from "../dnd.js";
 import { useAuth } from "../auth.jsx";
 import { useI18n } from "../i18n.jsx";
@@ -49,6 +49,7 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
   const [adding, setAdding] = useState(false);
   const [heading, setHeading] = useState("");
   const [text, setText] = useState("");
+  const [editing, setEditing] = useState(null); // { id, heading, text }
   const [dragId, setDragId] = useState(null);
   const [hover, setHover] = useState(null); // { id, zone }
   const numbers = useMemo(() => outlineNumbers(tree), [tree]);
@@ -78,6 +79,14 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
     await post(`/objects/${id}/move`, move).catch(onError);
     onChanged();
   };
+  const save = async (e) => {
+    e.preventDefault();
+    const { id, heading: h, text: tx } = editing;
+    await patch(`/objects/${id}`, { heading: h, text: tx }).catch(onError);
+    setEditing(null);
+    onChanged();
+  };
+  const onEditKey = (e) => e.key === "Escape" && setEditing(null);
   const remove = async (node) => {
     if (!window.confirm(`${node.display_id} ${node.heading}\n\n${t("modules.confirmDelete")}`)) return;
     await del(`/objects/${node.id}`).catch(onError);
@@ -107,6 +116,7 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
           <button className="primary" type="submit">{t("modules.addObject")}</button>
         </form>
       )}
+      {writable && <form id="edit-object" onSubmit={save} />}
       <div className="table-wrap">
         <table className="grid">
           <thead>
@@ -127,7 +137,7 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
               return (
                 <tr
                   key={node.id}
-                  draggable={writable}
+                  draggable={writable && editing?.id !== node.id}
                   className={hover?.id === node.id ? `drop-${hover.zone}` : undefined}
                   onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(node.id)); setDragId(node.id); }}
                   onDragOver={(e) => {
@@ -148,16 +158,41 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
                       <span className="twisty" />
                     )}
                     <span className="num">{numbers.get(node.id)}</span>
-                    <span>{node.heading}</span>
+                    {editing?.id === node.id ? (
+                      <input form="edit-object" aria-label={t("modules.objectHeading")} value={editing.heading} autoFocus onKeyDown={onEditKey}
+                        onChange={(e) => setEditing({ ...editing, heading: e.target.value })} />
+                    ) : (
+                      <span>{node.heading}</span>
+                    )}
                   </td>
                   <td style={{ whiteSpace: "nowrap" }}><Link to={`../objects/${node.id}`}>{node.display_id}</Link></td>
-                  <td>{node.text}</td>
+                  <td>
+                    {editing?.id === node.id ? (
+                      <input form="edit-object" aria-label={t("modules.objectText")} value={editing.text} onKeyDown={onEditKey} style={{ width: "100%" }}
+                        onChange={(e) => setEditing({ ...editing, text: e.target.value })} />
+                    ) : (
+                      node.text
+                    )}
+                  </td>
                   <td className="muted">—</td>
                   <td><span className="badge yellow">{t("status.notReviewed")}</span></td>
                   <td className="muted">—</td>
                   {writable && (
-                    <td>
-                      <button type="button" className="danger" aria-label={`${t("modules.delete")} ${node.display_id}`} title={t("modules.delete")} onClick={() => remove(node)}>✕</button>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {/* distinct keys: otherwise React turns the clicked Edit button into the submit button
+                          and the browser submits the form right after the click */}
+                      {editing?.id === node.id ? (
+                        <>
+                          <button key="save" className="primary" type="submit" form="edit-object">{t("common.save")}</button>{" "}
+                          <button key="cancel" type="button" onClick={() => setEditing(null)}>{t("common.cancel")}</button>
+                        </>
+                      ) : (
+                        <>
+                          <button key="edit" type="button" aria-label={`${t("common.edit")} ${node.display_id}`} title={t("common.edit")}
+                            onClick={() => setEditing({ id: node.id, heading: node.heading, text: node.text })}>✎</button>{" "}
+                          <button key="delete" type="button" className="danger" aria-label={`${t("modules.delete")} ${node.display_id}`} title={t("modules.delete")} onClick={() => remove(node)}>✕</button>
+                        </>
+                      )}
                     </td>
                   )}
                 </tr>

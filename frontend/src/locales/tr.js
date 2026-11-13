@@ -136,4 +136,6 @@ export default {
   "modules.objectText": "Metin (isteğe bağlı)",
   "modules.delete": "Sil",
   "modules.confirmDelete": "Bu nesne ve altındaki her şey silinsin mi? Kimliği bir daha kullanılmayacak.",
+  "common.save": "Kaydet",
+  "common.cancel": "İptal",
 };

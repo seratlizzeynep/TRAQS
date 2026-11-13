@@ -136,4 +136,6 @@ export default {
   "modules.objectText": "Text (optional)",
   "modules.delete": "Delete",
   "modules.confirmDelete": "Delete this object and everything below it? Its ID will never be used again.",
+  "common.save": "Save",
+  "common.cancel": "Cancel",
 };

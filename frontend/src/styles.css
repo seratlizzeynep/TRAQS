@@ -127,3 +127,7 @@ tr.drop-child td { background: var(--purple-soft); }
 
 button.danger { padding: .1rem .5rem; border-color: var(--red); color: var(--red); }
 button.danger:hover:not(:disabled) { background: var(--red-bg); }
+
+/* S3 table: keep the Text column readable (also while editing) */
+.grid th:nth-child(3), .grid td:nth-child(3) { min-width: 18rem; }
+.grid td.tree input { width: 13rem; }
