@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { get, post } from "../api.js";
+import { del, get, post } from "../api.js";
 import { dropTarget } from "../dnd.js";
 import { useAuth } from "../auth.jsx";
 import { useI18n } from "../i18n.jsx";
@@ -48,6 +48,7 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
   const [collapsed, setCollapsed] = useState(new Set());
   const [adding, setAdding] = useState(false);
   const [heading, setHeading] = useState("");
+  const [text, setText] = useState("");
   const [dragId, setDragId] = useState(null);
   const [hover, setHover] = useState(null); // { id, zone }
   const numbers = useMemo(() => outlineNumbers(tree), [tree]);
@@ -60,8 +61,9 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
   };
   const add = async (e) => {
     e.preventDefault();
-    await post(`/modules/${module.id}/objects`, { heading }).catch(onError);
+    await post(`/modules/${module.id}/objects`, { heading, text }).catch(onError);
     setHeading("");
+    setText("");
     setAdding(false);
     onChanged();
   };
@@ -74,6 +76,11 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
     endDrag();
     if (!move) return;
     await post(`/objects/${id}/move`, move).catch(onError);
+    onChanged();
+  };
+  const remove = async (node) => {
+    if (!window.confirm(`${node.display_id} ${node.heading}\n\n${t("modules.confirmDelete")}`)) return;
+    await del(`/objects/${node.id}`).catch(onError);
     onChanged();
   };
   const unavailable = { "aria-disabled": true, title: t("common.unavailable"), onClick: (e) => e.preventDefault() };
@@ -96,6 +103,7 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
       {writable && adding && (
         <form onSubmit={add} className="inline-form">
           <input aria-label={t("modules.objectHeading")} placeholder={t("modules.objectHeading")} value={heading} onChange={(e) => setHeading(e.target.value)} autoFocus />
+          <input aria-label={t("modules.objectText")} placeholder={t("modules.objectText")} value={text} onChange={(e) => setText(e.target.value)} style={{ flexBasis: "24rem" }} />
           <button className="primary" type="submit">{t("modules.addObject")}</button>
         </form>
       )}
@@ -106,11 +114,12 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
               {["col.tree", "col.id", "col.text", "col.priority", "col.status", "col.flags"].map((k) => (
                 <th key={k} scope="col">{t(k)}</th>
               ))}
+              {writable && <th scope="col"><span className="sr-only">{t("admin.actions")}</span></th>}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr className="empty-row"><td colSpan={6}>{t("modules.noObjects")}</td></tr>
+              <tr className="empty-row"><td colSpan={writable ? 7 : 6}>{t("modules.noObjects")}</td></tr>
             )}
             {rows.map(({ node, depth }) => {
               const has = node.children.length > 0;
@@ -141,11 +150,16 @@ function ModuleTable({ module, tree, q, writable, onChanged, onError }) {
                     <span className="num">{numbers.get(node.id)}</span>
                     <span>{node.heading}</span>
                   </td>
-                  <td><Link to={`../objects/${node.id}`}>{node.display_id}</Link></td>
+                  <td style={{ whiteSpace: "nowrap" }}><Link to={`../objects/${node.id}`}>{node.display_id}</Link></td>
                   <td>{node.text}</td>
                   <td className="muted">—</td>
                   <td><span className="badge yellow">{t("status.notReviewed")}</span></td>
                   <td className="muted">—</td>
+                  {writable && (
+                    <td>
+                      <button type="button" className="danger" aria-label={`${t("modules.delete")} ${node.display_id}`} title={t("modules.delete")} onClick={() => remove(node)}>✕</button>
+                    </td>
+                  )}
                 </tr>
               );
             })}

@@ -225,6 +225,43 @@ describe("signed in", () => {
     await waitFor(() => expect(moves).toEqual([{ parent_id: 1, position: null }]));
   });
 
+  it("authors add an object with heading and text", async () => {
+    const posts = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "POST /modules/7/objects": (opts) => { posts.push(JSON.parse(opts.body)); return json(201, { id: 9 }); },
+    });
+    mount("/projects/1/modules");
+    await userEvent.click(await screen.findByRole("button", { name: "+ Object" }));
+    await userEvent.type(screen.getByLabelText("Heading"), "Alarm");
+    await userEvent.type(screen.getByLabelText("Text (optional)"), "The system shall raise an alarm.");
+    await userEvent.click(screen.getByRole("button", { name: "Add object" }));
+    await waitFor(() => expect(posts).toEqual([{ heading: "Alarm", text: "The system shall raise an alarm." }]));
+  });
+
+  it("authors delete an object after confirming; cancelling does nothing", async () => {
+    const deleted = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "DELETE /objects/2": () => { deleted.push(2); return json(204, null); },
+    });
+    const confirm = vi.spyOn(window, "confirm");
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    confirm.mockReturnValueOnce(false);
+    await userEvent.click(screen.getByRole("button", { name: "Delete REQ-0002" }));
+    expect(deleted).toEqual([]);
+    confirm.mockReturnValueOnce(true);
+    await userEvent.click(screen.getByRole("button", { name: "Delete REQ-0002" }));
+    await waitFor(() => expect(deleted).toEqual([2]));
+    expect(confirm.mock.calls[1][0]).toMatch(/REQ-0002/);
+  });
+
+  it("viewers see no delete buttons", async () => {
+    signedIn(me());
+    mount("/projects/1/modules");
+    await screen.findByText("Battery");
+    expect(screen.queryByRole("button", { name: /^Delete/ })).not.toBeInTheDocument();
+  });
+
   it("viewers cannot drag rows", async () => {
     signedIn(me());
     mount("/projects/1/modules");

@@ -45,7 +45,7 @@ export default function TopBar({ projects: given }) {
   useEffect(() => {
     if (given) return;
     get("/projects").then(setProjects).catch(() => setProjects([]));
-  }, [given]);
+  }, [given, projectId]); // reload when another project is opened, so new projects show up
 
   const role = roleIn(user, projectId);
   const search = (e) => {

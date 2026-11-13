@@ -133,4 +133,7 @@ export default {
   "admin.exists": "This user name already exists.",
   "admin.done": "Saved.",
   "admin.globalAdmin": "Administrator of all projects",
+  "modules.objectText": "Text (optional)",
+  "modules.delete": "Delete",
+  "modules.confirmDelete": "Delete this object and everything below it? Its ID will never be used again.",
 };

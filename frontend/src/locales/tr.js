@@ -133,4 +133,7 @@ export default {
   "admin.exists": "Bu kullanıcı adı zaten var.",
   "admin.done": "Kaydedildi.",
   "admin.globalAdmin": "Tüm projelerin yöneticisi",
+  "modules.objectText": "Metin (isteğe bağlı)",
+  "modules.delete": "Sil",
+  "modules.confirmDelete": "Bu nesne ve altındaki her şey silinsin mi? Kimliği bir daha kullanılmayacak.",
 };
