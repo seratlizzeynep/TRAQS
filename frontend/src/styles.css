@@ -138,3 +138,12 @@ button.danger:hover:not(:disabled) { background: var(--red-bg); }
 .form-grid label.opt:has(input[type="checkbox"]) { display: flex; gap: .4rem; align-items: center; }
 .form-grid textarea { font: inherit; padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 6px; }
 .grid td input[type="number"], .grid td select, .grid td input[type="date"] { max-width: 11rem; }
+
+/* links card (S4) */
+.link-list { list-style: none; margin: 0 0 .5rem; padding: 0; display: grid; gap: .3rem; }
+.link-list .danger { margin-left: .5rem; padding: 0 .4rem; }
+.link-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .5rem; }
+.link-form .picker { position: relative; flex: 1 1 14rem; }
+.link-form .picker input { width: 100%; }
+.link-form .picker .results { top: 105%; }
+.link-form .chosen { flex: 1 1 14rem; }

@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Derives",
+    "inverse": "Derived from",
+    "description": "The target is derived from the source (e.g. a system requirement from a user requirement)."
+  },
+  {
+    "name": "Satisfies",
+    "inverse": "Satisfied by",
+    "description": "The source satisfies the target (e.g. a software requirement satisfies a system requirement)."
+  },
+  {
+    "name": "Verifies",
+    "inverse": "Verified by",
+    "description": "The source (a test case) verifies the target (a requirement)."
+  },
+  {
+    "name": "Refers",
+    "inverse": "Referred by",
+    "description": "Informative reference between any two objects; not counted in coverage.",
+    "informative": true
+  }
+]

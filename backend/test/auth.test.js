@@ -58,7 +58,7 @@ test("only an all-projects grant may create projects", withApp(async (c) => {
 test("links across projects are rejected", withApp(async (c) => {
   const a = await c.add(await c.module(), "A");
   const b = await c.add(await c.module(), "B");
-  assert.equal((await c.post(`/objects/${a.id}/links`, { target_id: b.id })).status, 422);
+  assert.equal((await c.post(`/objects/${a.id}/links`, { target_id: b.id, type: "Refers" })).status, 422);
 }));
 
 test("API is documented with OpenAPI and docs are public", withApp(async (c) => {

@@ -53,7 +53,7 @@ test("deleting a parent blacklists the whole subtree", withApp(async (c, m) => {
 test("links to deleted objects become suspect", withApp(async (c, m) => {
   const a = await c.add(m, "A");
   const b = await c.add(m, "B");
-  const l = (await c.post(`/objects/${a.id}/links`, { target_id: b.id })).body;
+  const l = (await c.post(`/objects/${a.id}/links`, { target_id: b.id, type: "Refers" })).body;
   assert.equal(l.suspect, 0);
   await c.del(`/objects/${b.id}`);
   const links = (await c.get(`/objects/${a.id}/links`)).body;
@@ -64,8 +64,8 @@ test("links to deleted objects become suspect", withApp(async (c, m) => {
 test("link validation", withApp(async (c, m) => {
   const a = await c.add(m, "A");
   const b = await c.add(m, "B");
-  assert.equal((await c.post(`/objects/${a.id}/links`, { target_id: a.id })).status, 422);
-  assert.equal((await c.post(`/objects/${a.id}/links`, { target_id: 999 })).status, 404);
-  assert.equal((await c.post(`/objects/${a.id}/links`, { target_id: b.id })).status, 201);
-  assert.equal((await c.post(`/objects/${a.id}/links`, { target_id: b.id })).status, 409);
+  assert.equal((await c.post(`/objects/${a.id}/links`, { target_id: a.id, type: "Refers" })).status, 422);
+  assert.equal((await c.post(`/objects/${a.id}/links`, { target_id: 999, type: "Refers" })).status, 404);
+  assert.equal((await c.post(`/objects/${a.id}/links`, { target_id: b.id, type: "Refers" })).status, 201);
+  assert.equal((await c.post(`/objects/${a.id}/links`, { target_id: b.id, type: "Refers" })).status, 409);
 }));
