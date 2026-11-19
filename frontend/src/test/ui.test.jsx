@@ -228,6 +228,23 @@ describe("signed in", () => {
     await waitFor(() => expect(puts).toEqual([{ priority: "Should", weight: null }]));
   });
 
+  it("Save works in every module, not only the first one", async () => {
+    const patches = [];
+    signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {
+      "GET /projects/1/modules": json(200, [{ id: 7, project_id: 1, name: "System" }, { id: 8, project_id: 1, name: "Software" }]),
+      "GET /modules/8/objects": json(200, [{ id: 20, display_id: "REQ-0020", heading: "Driver", text: "", attributes: {}, children: [] }]),
+      "PATCH /objects/20": (opts) => { patches.push(JSON.parse(opts.body)); return json(200, {}); },
+    });
+    mount("/projects/1/modules");
+    await screen.findByText("Driver");
+    await userEvent.click(screen.getByRole("button", { name: "Edit REQ-0020" })); // the second module
+    const heading = screen.getByLabelText("Heading");
+    await userEvent.clear(heading);
+    await userEvent.type(heading, "Driver 2");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patches).toEqual([{ heading: "Driver 2", text: "" }]));
+  });
+
   it("nothing is sent for attributes when none was changed", async () => {
     const puts = [];
     signedIn(me({ memberships: [{ project_id: 1, role: "author" }] }), {

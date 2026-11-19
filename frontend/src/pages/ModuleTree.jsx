@@ -52,6 +52,7 @@ function ModuleTable({ module, tree, q, writable, definitions, types, onChanged,
   const [heading, setHeading] = useState("");
   const [text, setText] = useState("");
   const [editing, setEditing] = useState(null); // { id, heading, text }
+  const formId = `edit-object-${module.id}`; // one edit form per module: a shared id sends Save to the first module
   const [dragId, setDragId] = useState(null);
   const [hover, setHover] = useState(null); // { id, zone }
   const numbers = useMemo(() => outlineNumbers(tree), [tree]);
@@ -128,7 +129,7 @@ function ModuleTable({ module, tree, q, writable, definitions, types, onChanged,
           <button className="primary" type="submit">{t("modules.addObject")}</button>
         </form>
       )}
-      {writable && <form id="edit-object" onSubmit={save} />}
+      {writable && <form id={formId} onSubmit={save} />}
       <div className="table-wrap">
         <table className="grid">
           <thead>
@@ -171,7 +172,7 @@ function ModuleTable({ module, tree, q, writable, definitions, types, onChanged,
                     )}
                     <span className="num">{numbers.get(node.id)}</span>
                     {editing?.id === node.id ? (
-                      <input form="edit-object" aria-label={t("modules.objectHeading")} value={editing.heading} autoFocus onKeyDown={onEditKey}
+                      <input form={formId} aria-label={t("modules.objectHeading")} value={editing.heading} autoFocus onKeyDown={onEditKey}
                         onChange={(e) => setEditing({ ...editing, heading: e.target.value })} />
                     ) : (
                       <span>{node.heading}</span>
@@ -180,7 +181,7 @@ function ModuleTable({ module, tree, q, writable, definitions, types, onChanged,
                   <td style={{ whiteSpace: "nowrap" }}><Link to={`../objects/${node.id}`}>{node.display_id}</Link></td>
                   <td>
                     {editing?.id === node.id ? (
-                      <input form="edit-object" aria-label={t("modules.objectText")} value={editing.text} onKeyDown={onEditKey} style={{ width: "100%" }}
+                      <input form={formId} aria-label={t("modules.objectText")} value={editing.text} onKeyDown={onEditKey} style={{ width: "100%" }}
                         onChange={(e) => setEditing({ ...editing, text: e.target.value })} />
                     ) : (
                       node.text
@@ -205,7 +206,7 @@ function ModuleTable({ module, tree, q, writable, definitions, types, onChanged,
                           and the browser submits the form right after the click */}
                       {editing?.id === node.id ? (
                         <>
-                          <button key="save" className="primary" type="submit" form="edit-object">{t("common.save")}</button>{" "}
+                          <button key="save" className="primary" type="submit" form={formId}>{t("common.save")}</button>{" "}
                           <button key="cancel" type="button" onClick={() => setEditing(null)}>{t("common.cancel")}</button>
                         </>
                       ) : (
