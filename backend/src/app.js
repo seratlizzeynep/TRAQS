@@ -6,6 +6,8 @@ import { createAttributeService } from "./attributes/service.js";
 import { mountAttributeRoutes } from "./attributes/routes.js";
 import { createLinkService } from "./links/service.js";
 import { mountLinkRoutes } from "./links/routes.js";
+import { createTraceabilityService } from "./traceability/service.js";
+import { mountTraceabilityRoutes } from "./traceability/routes.js";
 import { openapi, docsHtml } from "./openapi.js";
 
 const isInt = (v) => Number.isInteger(v);
@@ -43,6 +45,7 @@ export function createApp(db, options = {}) {
   const auth = createAuth(db, options);
   const attrs = createAttributeService(db, { defaults: options.defaultAttributes ?? [] });
   const links = createLinkService(db, { config: options.linkRules ?? {}, attrs });
+  const trace = createTraceabilityService(db, { config: links.config });
   const { access, canSeeProject: visibleProject } = auth;
   const app = express();
   app.use(express.json());
@@ -309,6 +312,7 @@ export function createApp(db, options = {}) {
   });
 
   mountLinkRoutes(api, { links, db, find, id, access, projectOfObject });
+  mountTraceabilityRoutes(api, { trace, find, id, access });
   mountAttributeRoutes(api, { svc: attrs, db, find, id, access, projectOfObject, objOut });
 
   app.use("/api/v1", api);

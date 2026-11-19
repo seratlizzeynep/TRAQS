@@ -4,6 +4,7 @@
 //   kind_attribute   key of the attribute that tells what kind an object is (e.g. "level": UR, SR, SW, DI, TC)
 //   levels           the requirement levels, from top to bottom (used to report skipped levels)
 //   groups           names for sets of kinds, usable in rules ("requirement": ["UR", "SR", "SW"])
+//   test_kind        kind of test cases (default "TC"); design_kind: kind of design items (default "DI")
 //   unknown_kind     what to do when a rule needs the kind of an object that has none: "refuse" | "allow"
 //   types            the link types: { name, inverse, description, informative }
 //   rules            per link type: { description, descriptions, allow, allow_skip_levels, acyclic }
@@ -66,7 +67,11 @@ export function normalizeLinkConfig(raw = {}) {
     }
     rules[type] = { description: r.description ?? "", descriptions, allow, allow_skip_levels: r.allow_skip_levels === true, acyclic: r.acyclic === true };
   }
-  return { kind_attribute: kindAttribute, levels, groups, unknown_kind: unknownKind, types, rules };
+  // kinds the traceability views treat as tests and design items
+  const testKind = raw.test_kind ?? "TC";
+  const designKind = raw.design_kind ?? "DI";
+  if (!isStr(testKind) || !isStr(designKind)) throw new Error("test_kind and design_kind must be kind names");
+  return { kind_attribute: kindAttribute, levels, groups, unknown_kind: unknownKind, test_kind: testKind, design_kind: designKind, types, rules };
 }
 
 const OK = { status: "ok", message: "" };

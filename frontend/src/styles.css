@@ -149,3 +149,10 @@ button.danger:hover:not(:disabled) { background: var(--red-bg); }
 .link-form .chosen { flex: 1 1 14rem; }
 
 .rule-hint { flex-basis: 100%; margin: 0; font-size: .85rem; }
+
+/* traceability tree (S6) */
+tr.gap-row td { background: var(--red-bg); }
+button.linkish { padding: 0 .4rem; border: 0; background: none; color: var(--purple); text-decoration: underline; font-weight: 700; }
+button.linkish:disabled { color: var(--muted); text-decoration: none; }
+ul.plain { list-style: none; padding: 0; margin: 0 0 .75rem; }
+.muted { color: var(--muted); }

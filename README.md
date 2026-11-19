@@ -8,6 +8,7 @@ The reports are in [`docs/`](docs/) and the project web page is [`index.html`](i
 
 - Projects, modules and hierarchical, ordered objects (parent/child with an explicit position)
 - Sequential object IDs (`REQ-0001`), soft delete with an ID blacklist (an ID is never reused)
+- Traceability screen: branching tree UR → SR → SW → test with gap rows, suspect and skipped-level marks, per-branch coverage, level-by-level coverage table and test usage (unused / shared tests)
 - Typed links between objects (Derives, Satisfies, Verifies, Refers), within and across modules; links to deleted objects become *suspect*
 - User-defined, typed attributes per project (text, enumeration, number, date) shown as columns in the module table
 - Versioned REST API under `/api/v1` with OpenAPI documentation
@@ -16,7 +17,8 @@ The reports are in [`docs/`](docs/) and the project web page is [`index.html`](i
 - React single-page app with Turkish and English interface
 
 Screens S7 (change request) and S12 (analysis dashboard) are mock-ups with sample data; the
-AI assistant, baselines, traceability and import/export are not built yet.
+AI assistant, baselines and import/export are not built yet. The traceability screen does not yet
+show test results or history (needs test cases, audit log and baselines).
 
 ## Repository layout
 
@@ -105,6 +107,7 @@ Every call is checked against the user's role in the project.
 | Modules | `/projects/{id}/modules`, `/modules/{id}` |
 | Objects | `/modules/{id}/objects` (tree or `?flat=true`), `/objects/{id}`, `POST /objects/{id}/move` |
 | Links | `/link-types`, `/objects/{id}/links` (create with `type`), `DELETE /links/{id}`, `/projects/{id}/link-issues` |
+| Traceability | `/projects/{id}/trace-tree`, `/projects/{id}/trace-coverage` |
 | Attributes | `/attribute-types`, `/projects/{id}/attributes`, `/attributes/{id}`, `PUT /objects/{id}/attributes` |
 | Users | `/users`, `/users/{id}/unlock` |
 

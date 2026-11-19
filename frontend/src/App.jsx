@@ -12,6 +12,7 @@ import ModuleTree from "./pages/ModuleTree.jsx";
 import Placeholder from "./pages/Placeholder.jsx";
 import ProjectLayout from "./pages/ProjectLayout.jsx";
 import Projects from "./pages/Projects.jsx";
+import Traceability from "./pages/Traceability.jsx";
 
 function Shell() {
   return (
@@ -40,9 +41,10 @@ export default function App() {
           <Route path="objects/:objectId" element={<ObjectDetail />} />
           <Route path="changes" element={<ChangeRequest />} />
           <Route path="analysis" element={<AnalysisDashboard />} />
+          <Route path="traceability" element={<Traceability />} />
           <Route path="admin" element={<Administration />} />
           <Route path="attributes" element={<Attributes />} />
-          {NAV_ITEMS.filter((i) => !["modules", "changes", "analysis", "admin", "attributes"].includes(i.key)).map((i) => (
+          {NAV_ITEMS.filter((i) => !["modules", "traceability", "changes", "analysis", "admin", "attributes"].includes(i.key)).map((i) => (
             <Route key={i.key} path={i.path} element={<Placeholder titleKey={i.labelKey} />} />
           ))}
         </Route>

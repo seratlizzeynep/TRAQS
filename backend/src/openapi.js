@@ -37,6 +37,7 @@ export const openapi = {
     { name: "Modules" },
     { name: "Objects" },
     { name: "Links" },
+    { name: "Traceability" },
     { name: "Meta" },
     { name: "Auth" },
     { name: "Users" },
@@ -419,6 +420,18 @@ export const openapi = {
       get: op("Links of the project that skip a level (gap) or no longer satisfy the link rules", "Links", {
         params: [idParam],
         responses: ok("Links with rule.status gap or violation", arr(ref("Link"))),
+      }),
+    },
+    "/projects/{id}/trace-tree": {
+      get: op("Traceability tree: branches from every top-level requirement (UR) down to the tests, gaps marked, coverage rolled up per branch", "Traceability", {
+        params: [idParam],
+        responses: ok("Tree", { type: "object" }),
+      }),
+    },
+    "/projects/{id}/trace-coverage": {
+      get: op("Level-by-level coverage (UR to SR, SR to SW, SW to test, end to end), orphans, skipped levels, suspect links and test usage", "Traceability", {
+        params: [idParam],
+        responses: ok("Coverage", { type: "object" }),
       }),
     },
     "/objects/{id}/links": {
